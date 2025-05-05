@@ -8,7 +8,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${BACKEND_PORT:-8080}:8080" # 将宿主机端口映射到容器的 8080 端口
+      - "${BACKEND_PORT:-8080}:${BACKEND_PORT:-8080}" # 将宿主机端口映射到容器的 8080 端口
     networks:
       - bilibili-watcher-net
     depends_on:
@@ -27,7 +27,7 @@ services:
       - "${FRONTEND_PORT:-3000}:3000" # 将宿主机端口映射到容器的 3000 端口
     environment: 
       # 前端需要访问的后端 API 地址
-      - BACKEND_API_URL=http://backend:8080
+      - BACKEND_API_URL=http://backend:${BACKEND_PORT:-8080}
     networks:
       - bilibili-watcher-net
     depends_on:
