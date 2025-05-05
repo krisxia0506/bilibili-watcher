@@ -1,0 +1,65 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: bilibili-watcher-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${BACKEND_PORT:-8080}:8080" # 将宿主机端口映射到容器的 8080 端口
+    networks:
+      - bilibili-watcher-net
+    depends_on:
+      db: # 确保数据库先启动
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: bilibili-watcher-frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000" # 将宿主机端口映射到容器的 3000 端口
+    environment: 
+      # 前端需要访问的后端 API 地址
+      - BACKEND_API_URL=http://backend:8080
+    networks:
+      - bilibili-watcher-net
+    depends_on:
+      - backend # 前端可能依赖后端 API
+
+  db:
+    image: mysql:8.0
+    container_name: bilibili-watcher-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DATABASE_DBNAME}
+      MYSQL_USER: ${DATABASE_USER}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
+    ports:
+      # 可选：将宿主机端口映射到 MySQL 端口，方便外部工具连接调试
+      - "${DATABASE_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql # 持久化数据库数据
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u$${DATABASE_USER}", "-p$${DATABASE_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bilibili-watcher-net
+
+volumes:
+  db_data: # 定义数据库数据卷
+
+networks:
+  bilibili-watcher-net: # 定义网络
+    driver: bridge 

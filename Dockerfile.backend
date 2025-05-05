@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1
+
+# Build Stage
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /app
+
+# 复制 go mod 文件并下载依赖
+COPY go.mod go.sum ./
+RUN go mod download
+
+# 复制源代码
+COPY . .
+
+# 编译 Go 应用
+# CGO_ENABLED=0 禁用 CGO，以便静态链接
+# -ldflags "-s -w" 剥离调试信息，减小镜像体积
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /server cmd/main.go
+
+# Final Stage
+FROM alpine:latest
+
+WORKDIR /app
+
+# 从 builder 阶段复制编译后的二进制文件和配置文件
+COPY --from=builder /server /app/server
+
+# 暴露应用端口
+EXPOSE 8081
+
+# 容器启动时运行的命令
+CMD ["/app/server"] 

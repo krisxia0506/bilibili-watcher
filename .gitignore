@@ -1,0 +1,42 @@
+# 环境变量文件
+.env
+
+# GoLand IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+
+# 编译产物
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 测试二进制文件
+*.test
+
+# 输出的概要文件
+*.out
+
+# 日志文件
+*.log
+logs/
+
+# macOS文件
+.DS_Store
+
+# 临时文件
+tmp/
+temp/
+
+# Go工作区文件
+go.work 
+
+# cursor
+.cursor/
