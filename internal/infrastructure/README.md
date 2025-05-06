@@ -1,27 +1,32 @@
-# Infrastructure Layer
+# Infrastructure Layer (`internal/infrastructure`)
 
-基础设施层负责提供技术能力来支持上层（应用层和领域层）。它包含了与外部系统、框架和工具交互的所有代码。
+基础设施层负责实现应用层和领域层定义的接口，提供与外部系统和技术细节交互的能力。
 
 ## 主要职责
 
-*   实现领域层定义的接口（例如，仓库接口）。
-*   实现应用层定义的接口（例如，外部服务调用接口，如 `VideoProgressFetcher`）。
-*   封装与具体技术相关的实现细节，例如：
-    *   数据库访问（使用 ORM 如 GORM，或直接 SQL）。
-    *   外部 API 客户端（如调用 Bilibili API）。
-    *   消息队列的生产者和消费者。
-    *   文件系统操作。
-    *   缓存实现。
-    *   Web 框架适配（HTTP handlers/controllers, 路由定义）。
-    *   定时任务调度器。
-*   处理数据的转换，例如将数据库模型映射到领域对象（在仓库实现中），或将外部 API 响应映射到应用层定义的数据结构（在 Fetcher 实现中）。
+*   实现领域层定义的仓库接口（例如，使用 GORM 与数据库交互）。
+*   实现应用层定义的外部服务接口（例如，调用 Bilibili API）。
+*   处理具体的技术细节，如数据库连接、HTTP 请求、文件系统访问、消息队列交互、定时任务调度等。
+*   将基础设施特定的数据结构（如数据库行、API 响应）与领域模型或应用层 DTO 进行转换。
 
 ## 子目录
 
-*   `bilibili/`: Bilibili API 客户端和应用层 Fetcher 接口的实现。
-*   `persistence/`: 数据持久化相关实现，包括 GORM 数据库连接和仓库接口实现。
-*   `scheduler/`: 定时任务调度器的实现。
-*   `web/`: (目前为空) Web 框架适配相关代码，如 Gin handlers 和路由。
+*   `bilibili/`: 包含与 Bilibili API 交互的具体实现。
+    *   `client.go`: 提供了通用的 Bilibili HTTP 客户端，处理请求发送、认证、基础错误处理。
+    *   `video_progress.go`: 实现了 `GetVideoProgress` 方法，调用 Bilibili API 获取视频进度，并将响应映射到应用层 DTO。
+    *   `video_view.go`: 实现了 `GetVideoView` 方法，调用 Bilibili API 获取视频详情，并将响应映射到应用层 DTO。
+*   `persistence/`: 包含数据持久化的具体实现。
+    *   `db.go`: 负责初始化和管理数据库连接（GORM）。
+    *   `video_progress_repository.go`: 实现了 `VideoProgressRepository` 接口，使用 GORM 将 `VideoProgress` 领域模型持久化到数据库。
+*   `scheduler/`: 包含定时任务调度器的实现。
+    *   `scheduler.go`: 使用 `robfig/cron` 库实现定时任务调度，负责按计划触发应用层服务。
+*   `web/`: (可选，如果 Gin 相关代码放在这里) 包含与 Web 框架（如 Gin）适配的代码，例如路由设置、请求/响应处理的适配器等。（当前项目的 Gin 设置主要在 `cmd/main.go` 和潜在的 handlers 中）
+
+## 关键原则
+
+*   **依赖倒置**: 实现了上层（应用层、领域层）定义的接口。
+*   **技术细节封装**: 将具体的技术实现细节封装在此层，使上层保持稳定。
+*   **数据映射**: 负责在基础设施数据格式和上层所需的数据格式（领域模型、DTO）之间进行转换。
 
 ## 注意
 

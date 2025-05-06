@@ -15,7 +15,9 @@ CREATE TABLE IF NOT EXISTS `video_progress` (
   PRIMARY KEY (`id`),
   INDEX `idx_video_progress_aid` (`aid`),
   INDEX `idx_video_progress_last_play_cid` (`last_play_cid`),
-  INDEX `idx_video_progress_recorded_at` (`recorded_at`)
+  INDEX `idx_video_progress_recorded_at` (`recorded_at`),
+  INDEX `idx_bvid` (`bvid`),
+  INDEX `idx_gmt_create` (`gmt_create`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='视频观看进度记录';
 
 -- Note:

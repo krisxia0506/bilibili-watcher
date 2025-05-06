@@ -4,78 +4,69 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/krisxia0506/bilibili-watcher/internal/domain/model"
 	"github.com/krisxia0506/bilibili-watcher/internal/domain/repository"
 )
 
-// VideoProgressService 定义了用于管理视频进度的应用服务接口。
-type VideoProgressService interface {
-	// RecordProgressForTargetVideo 获取并记录预定义目标视频的进度。
-	RecordProgressForTargetVideo(ctx context.Context) error
-	// TODO: 添加管理目标视频的方法 (增/删/查)
-	// TODO: 添加获取聚合观看时长数据的方法
+// VideoProgressService 应用服务，处理视频进度相关的用例。
+type VideoProgressService struct {
+	repo   repository.VideoProgressRepository
+	client BilibiliClient // 使用新的通用 Bilibili Client 接口
 }
 
-// videoProgressService 实现了 VideoProgressService 接口。
-type videoProgressService struct {
-	videoRepo repository.VideoProgressRepository
-	fetcher   VideoProgressFetcher // 依赖于应用层定义的 fetcher 接口
-	// TODO: 使目标视频可配置
-	targetAID string
-	targetCID string
-}
-
-// NewVideoProgressService 创建一个新的 VideoProgressService 实例。
-func NewVideoProgressService(repo repository.VideoProgressRepository, fetcher VideoProgressFetcher) VideoProgressService {
-	// TODO: 从配置或其他来源加载 targetAID 和 targetCID
-	return &videoProgressService{
-		videoRepo: repo,
-		fetcher:   fetcher,
-		targetAID: "114102919764678", // 从用户示例硬编码
-		targetCID: "28682552616",     // 从用户示例硬编码
+// NewVideoProgressService 创建 VideoProgressService 实例。
+func NewVideoProgressService(repo repository.VideoProgressRepository, client BilibiliClient) *VideoProgressService {
+	return &VideoProgressService{
+		repo:   repo,
+		client: client, // 注入 BilibiliClient
 	}
 }
 
-// RecordProgressForTargetVideo 获取并记录硬编码目标视频的进度。
-func (s *videoProgressService) RecordProgressForTargetVideo(ctx context.Context) error {
-	log.Printf("Fetching progress for AID: %s, CID: %s", s.targetAID, s.targetCID)
+// FetchAndSaveVideoProgress 获取指定视频的观看进度并保存到仓库。
+// 这是定时任务的主要执行逻辑。
+func (s *VideoProgressService) FetchAndSaveVideoProgress(ctx context.Context, aidStr, cidStr string) error {
+	log.Printf("Fetching progress for AID: %s, CID: %s", aidStr, cidStr)
 
-	// 使用 fetcher 接口获取进度数据
-	fetchedData, err := s.fetcher.Fetch(ctx, s.targetAID, s.targetCID)
+	// 1. 调用 Bilibili Client 获取进度
+	progressDTO, err := s.client.GetVideoProgress(ctx, aidStr, cidStr)
 	if err != nil {
-		// 记录来自 fetcher 的错误
-		log.Printf("Error fetching video progress via fetcher: %v", err)
-		// 根据 fetcher 返回的错误类型，可能需要特定处理。
-		return fmt.Errorf("failed to fetch video progress: %w", err)
+		// 底层 Client 实现已处理 API 错误和网络错误，这里只记录并返回包装后的错误
+		log.Printf("Error fetching video progress from Bilibili client for AID %s, CID %s: %v", aidStr, cidStr, err)
+		return fmt.Errorf("failed to fetch video progress from bilibili client: %w", err)
 	}
 
-	// 检查 fetcher 是否返回了有效数据 (fetcher 实现在进度非正数时返回 nil data)
-	if fetchedData == nil {
-		log.Printf("Fetcher returned no valid progress data for AID %s, CID %s. Skipping save.", s.targetAID, s.targetCID)
-		// 这不是一个错误，只是没有新的数据需要记录。
+	// 如果 DTO 为 nil，表示 API 调用成功但没有有效的进度信息 (例如进度为0)
+	if progressDTO == nil {
+		log.Printf("No valid progress data returned from Bilibili API for AID %s, CID %s. Skipping save.", aidStr, cidStr)
+		// 根据业务需求，这里可以选择是否保存一条进度为 0 的记录
+		// 当前选择跳过，不保存记录
 		return nil
 	}
 
-	log.Printf("Successfully fetched progress: %d ms (BVID: %s) for AID %s, CID %s",
-		fetchedData.LastPlayTime, fetchedData.BVID, s.targetAID, s.targetCID)
+	log.Printf("Successfully fetched progress for AID %d (BVID: %s): LastPlayTime=%dms, LastPlayCid=%d",
+		progressDTO.AID, progressDTO.BVID, progressDTO.LastPlayTime, progressDTO.LastPlayCid)
 
-	// 直接使用从 fetcher 获取的数据填充模型
-	progressRecord := &model.VideoProgress{
-		AID:          fetchedData.AID,
-		BVID:         fetchedData.BVID,
-		LastPlayCID:  fetchedData.LastPlayCid,  // 更新的字段名
-		LastPlayTime: fetchedData.LastPlayTime, // 更新的字段名
-		RecordedAt:   time.Now(),               // 记录获取时的时间
-		// GmtCreate 和 GmtModified 将由 GORM 处理
+	// 2. 将 DTO 转换为领域模型
+	aid := progressDTO.AID
+
+	// 创建新记录
+	progressToSave := &model.VideoProgress{
+		AID:          aid,
+		BVID:         progressDTO.BVID, // 保存 BVID
+		LastPlayCID:  progressDTO.LastPlayCid,              // 修复大小写
+		LastPlayTime: progressDTO.LastPlayTime,
+	}
+	log.Printf("Creating new progress record for AID %d", aid)
+
+	// 4. 保存到仓库
+	if err := s.repo.Save(ctx, progressToSave); err != nil {
+		log.Printf("Error saving video progress for AID %d: %v", aid, err)
+		return fmt.Errorf("failed to save video progress: %w", err)
 	}
 
-	if err := s.videoRepo.Save(ctx, progressRecord); err != nil {
-		log.Printf("Error saving video progress to database for AID %s, CID %s: %v", s.targetAID, s.targetCID, err)
-		return fmt.Errorf("failed to save progress record: %w", err)
-	}
-
-	log.Printf("Successfully saved progress record ID: %d for AID %s, CID %s", progressRecord.ID, s.targetAID, s.targetCID)
+	log.Printf("Successfully saved progress for AID %d", aid)
 	return nil
 }
+
+// TODO: 添加其他应用服务方法，例如计算每日观看时长等

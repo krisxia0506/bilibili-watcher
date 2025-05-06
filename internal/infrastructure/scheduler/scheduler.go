@@ -12,11 +12,11 @@ import (
 // Scheduler 管理定时任务。
 type Scheduler struct {
 	cronRunner  *cron.Cron
-	progressSvc application.VideoProgressService
+	progressSvc *application.VideoProgressService
 }
 
 // NewScheduler 创建一个新的 Scheduler 实例。
-func NewScheduler(progressSvc application.VideoProgressService) *Scheduler {
+func NewScheduler(progressSvc *application.VideoProgressService) *Scheduler {
 	// 使用支持秒字段的 cron runner
 	c := cron.New(cron.WithSeconds())
 	return &Scheduler{
@@ -39,14 +39,20 @@ func (s *Scheduler) RegisterJobs(schedule string) error {
 
 // runRecordProgressJob 是由 cron job 执行的函数。
 func (s *Scheduler) runRecordProgressJob() {
-	log.Println("Cron job starting: RecordProgressForTargetVideo")
+	// TODO: 从配置或数据库加载要追踪的视频列表
+	// 暂时硬编码一个目标视频用于测试
+	targetAID := "114102919764678" // 示例 AID
+	targetCID := "28682552616" // 示例 CID
+
+	log.Printf("Cron job starting: FetchAndSaveVideoProgress for AID: %s, CID: %s", targetAID, targetCID)
 	ctx := context.Background() // 为计划任务使用 background context
-	err := s.progressSvc.RecordProgressForTargetVideo(ctx)
+	// 调用新的方法，并传入 AID 和 CID
+	err := s.progressSvc.FetchAndSaveVideoProgress(ctx, targetAID, targetCID)
 	if err != nil {
 		// 记录错误，但任务会在下一个计划时间再次运行
-		log.Printf("Error executing RecordProgressForTargetVideo job: %v", err)
+		log.Printf("Error executing FetchAndSaveVideoProgress job for AID %s: %v", targetAID, err)
 	}
-	log.Println("Cron job finished: RecordProgressForTargetVideo")
+	log.Printf("Cron job finished: FetchAndSaveVideoProgress for AID: %s", targetAID)
 }
 
 // Start 启动 cron 调度器。

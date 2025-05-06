@@ -36,19 +36,16 @@ func main() {
 	log.Println("Successfully connected to the database.")
 
 	// --- 初始化基础设施组件 ---
-	// Bilibili 客户端 (底层 API 交互)
+	// Bilibili 客户端 (底层 API 交互, 同时实现了 application.BilibiliClient)
 	biliClient := bilibili.NewClient()
 	log.Println("Bilibili client initialized.")
-	// Bilibili Fetcher (实现 application.VideoProgressFetcher)
-	biliFetcher := bilibili.NewBilibiliFetcher(biliClient)
-	log.Println("Bilibili fetcher initialized.")
 	// Repository 实现
 	videoProgressRepo := persistence.NewGormVideoProgressRepository(db)
 	log.Println("Video progress repository initialized.")
 
 	// --- 初始化应用服务 ---
-	// 注入 fetcher *接口* 的实现
-	videoProgressService := application.NewVideoProgressService(videoProgressRepo, biliFetcher)
+	// 直接注入 BilibiliClient 接口实现
+	videoProgressService := application.NewVideoProgressService(videoProgressRepo, biliClient)
 	log.Println("Video progress service initialized.")
 
 	// --- 设置 Gin 和路由 ---
@@ -59,6 +56,7 @@ func main() {
 	// TODO: 注册实际的 API 路由
 
 	// --- 初始化并启动调度器 ---
+	// 将 videoProgressService (指针类型) 传递给调度器
 	appScheduler := scheduler.NewScheduler(videoProgressService)
 	if err := appScheduler.RegisterJobs(cfg.Scheduler.Cron); err != nil {
 		log.Fatalf("Failed to register scheduler jobs: %v", err)

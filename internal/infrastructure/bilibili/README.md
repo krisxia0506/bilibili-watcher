@@ -1,28 +1,23 @@
-# Bilibili Infrastructure
+# Bilibili API Client (`internal/infrastructure/bilibili`)
 
-此目录包含与 Bilibili API 交互相关的基础设施代码。
+此目录包含与 Bilibili API 进行交互的具体实现。
 
 ## 主要职责
 
-*   封装调用 Bilibili HTTP API 的底层细节。
-*   处理 HTTP 请求的构建、发送和响应解析。
-*   定义与特定 Bilibili API 端点对应的请求和响应数据结构。
-*   实现应用层定义的 `VideoProgressFetcher` 接口，将具体的 API 调用结果转换为应用层所需的数据格式。
+*   提供一个通用的 HTTP 客户端 (`Client`) 来处理对 Bilibili API 的请求。
+*   封装 API 请求的细节，如构建 URL、设置必要的 Header (包括 Cookie `SESSDATA`)、发送请求、处理 HTTP 状态码和基础错误。
+*   实现 `application.BilibiliClient` 接口，提供应用层所需的操作（如获取视频进度、获取视频信息）。
+*   定义 Bilibili API 响应的具体数据结构。
+*   将从 Bilibili API 获取的原始响应数据映射到应用层定义的 DTO。
 
-## 当前内容
+## 主要组件
 
-*   `client.go`: 定义了底层的 Bilibili API 客户端。
-    *   `Client` 结构体: 包含 `http.Client` 和基础配置。
-    *   `VideoProgressResponse`, `VideoProgressData` 及嵌套结构体: 定义了 `/x/player/wbi/v2` 端点的响应 JSON 结构。
-    *   `NewClient()`: 创建客户端实例。
-    *   `GetVideoProgress(aid, cid string) (*VideoProgressResponse, error)`: 调用 Bilibili API 获取指定视频的观看进度，返回原始的 API 响应结构体。
-*   `fetcher.go`: 实现了应用层的 `VideoProgressFetcher` 接口。
-    *   `bilibiliFetcher` 结构体: 包装了 `Client`。
-    *   `NewBilibiliFetcher(client *Client)`: 创建 fetcher 实例。
-    *   `Fetch(ctx context.Context, aid, cid string) (*application.FetchedProgressData, error)`: 调用 `client.GetVideoProgress`，并将结果（如果有效）映射到应用层定义的 `application.FetchedProgressData` 结构。
+*   `client.go`: 定义了 `Client` 结构体和通用的 `Get` 方法。`Client` 负责维护 `http.Client`、基础 URL 和认证信息（如 `SESSDATA`）。`Get` 方法处理通用的 GET 请求逻辑。
+*   `video_progress.go`: 包含 `GetVideoProgress` 方法的实现（作为 `*Client` 的方法）。此方法调用 `/x/player/wbi/v2` API，解析响应，并将其映射到 `application.VideoProgressDTO`。
+*   `video_view.go`: 包含 `GetVideoView` 方法的实现（作为 `*Client` 的方法）。此方法调用 `/x/web-interface/view` API，解析响应，并将其映射到 `application.VideoViewDTO`。
 
 ## 注意
 
-*   `Client` 负责处理原始的 HTTP 通信和 JSON 解析，保持与 Bilibili API 的一致性。
-*   `Fetcher` 负责适配应用层的需求，将基础设施的细节（如复杂的 API 响应结构）与应用层隔离。
-*   TODO: 实现动态加载 Cookie、处理 WBI 签名（如果需要）。 
+*   当前 `SESSDATA` 是硬编码的，标记为 TODO，未来应改为动态加载。
+*   `GetVideoProgress` 和 `GetVideoView` 共同为 `*Client` 类型添加了方法，使其完整实现了 `application.BilibiliClient` 接口。
+*   错误处理：底层 `Get` 方法处理 HTTP 和解码错误，各个具体的 API 方法 (`GetVideoProgress`, `GetVideoView`) 处理 Bilibili 返回的业务错误码 (`code != 0`)，并将基础设施的响应映射到应用层 DTO 或错误。 
