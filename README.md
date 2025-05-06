@@ -100,3 +100,6 @@ graph LR
     *   前端: `http://localhost:3000` (或其他在 `.env` 中配置的端口)
     *   后端 API: `http://localhost:8080` (或其他在 `.env` 中配置的端口)
 5.  **停止**: 运行 `docker-compose down`。 
+
+## 参考项目
+[哔哩哔哩 - API 收集整理](https://socialsisteryi.github.io/bilibili-API-collect/)
