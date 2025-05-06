@@ -9,22 +9,23 @@ type VideoProgressDTO struct {
 	// 可以根据需要从 bilibili.VideoProgressData 添加更多字段
 }
 
-// VideoViewDTO 应用层关心的视频视图数据
-type VideoViewDTO struct {
-	Bvid      string `json:"bvid"`
-	Aid       int64  `json:"aid"`
-	Title     string `json:"title"`
-	Desc      string `json:"desc"`
-	Pubdate   int64  `json:"pubdate"`  // 发布时间戳
-	Duration  int64  `json:"duration"` // 总时长(秒)
-	OwnerName string `json:"owner_name"`
-	// 可以根据需要从 bilibili.VideoViewData 添加更多字段
-	// Pages []VideoViewPageDTO // 如果需要分P信息，可以定义 Page DTO
+// VideoViewPageDTO 应用层关心的分P信息
+type VideoViewPageDTO struct {
+	Cid      int64  `json:"cid"`
+	Part     string `json:"part"`     // 分P标题
+	Duration int64  `json:"duration"` // 分P时长（秒）
+	Page     int    `json:"page"`     // 分P序号
 }
 
-// // VideoViewPageDTO 应用层关心的分P信息 (如果需要)
-// type VideoViewPageDTO struct {
-// 	Cid      int64  `json:"cid"`
-// 	Part     string `json:"part"`
-// 	Duration int64  `json:"duration"`
-// }
+// VideoViewDTO 应用层关心的视频视图数据
+type VideoViewDTO struct {
+	Bvid      string             `json:"bvid"`
+	Aid       int64              `json:"aid"`
+	Title     string             `json:"title"`
+	Desc      string             `json:"desc"`
+	Pubdate   int64              `json:"pubdate"`  // 发布时间戳
+	Duration  int64              `json:"duration"` // 总时长(秒)
+	OwnerName string             `json:"owner_name"`
+	Pages     []VideoViewPageDTO `json:"pages"` // 新增：分P信息列表
+	// 可以根据需要从 bilibili.VideoViewData 添加更多字段
+}

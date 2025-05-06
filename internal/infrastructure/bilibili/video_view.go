@@ -210,6 +210,17 @@ func (c *Client) GetVideoView(ctx context.Context, aid, bvid string) (*applicati
 		return nil, fmt.Errorf("received invalid data from GetVideoView: missing aid and bvid")
 	}
 
+	// 映射 Pages
+	pagesDTO := make([]application.VideoViewPageDTO, 0, len(resp.Data.Pages))
+	for _, p := range resp.Data.Pages {
+		pagesDTO = append(pagesDTO, application.VideoViewPageDTO{
+			Cid:      p.Cid,
+			Part:     p.Part,
+			Duration: p.Duration,
+			Page:     p.Page,
+		})
+	}
+
 	dto := &application.VideoViewDTO{
 		Bvid:      resp.Data.Bvid,
 		Aid:       resp.Data.Aid,
@@ -218,9 +229,8 @@ func (c *Client) GetVideoView(ctx context.Context, aid, bvid string) (*applicati
 		Pubdate:   resp.Data.Pubdate,
 		Duration:  resp.Data.Duration,
 		OwnerName: resp.Data.Owner.Name,
+		Pages:     pagesDTO, // 填充 Pages DTO
 	}
-
-	// TODO: 可以根据需要映射 Pages 等其他信息到 DTO
 
 	return dto, nil
 }
