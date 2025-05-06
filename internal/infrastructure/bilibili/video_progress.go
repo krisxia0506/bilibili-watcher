@@ -3,8 +3,8 @@ package bilibili
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/url"
+	"strconv"
 
 	"github.com/krisxia0506/bilibili-watcher/internal/application"
 )
@@ -163,41 +163,55 @@ type VideoProgressResponse struct {
 
 // GetVideoProgress 调用 Bilibili API 获取指定视频的观看进度，并返回应用层 DTO。
 // 实现 application.BilibiliClient 接口的一部分。
-// aid: 视频的 AV 号 (不带 'av' 前缀)
-// cid: 视频的分 P ID (当前页面的 CID)
-func (c *Client) GetVideoProgress(ctx context.Context, aid, cid string) (*application.VideoProgressDTO, error) {
-	log.Printf("Getting video progress for AID: %s, CID: %s", aid, cid)
+// aidStr (视频稿件 avid) 和 bvidStr (视频稿件 bvid) 必须提供一个。
+// cidStr (视频分P的 ID) 必须提供。
+func (c *Client) GetVideoProgress(ctx context.Context, aidStr, bvidStr, cidStr string) (*application.VideoProgressDTO, error) {
 	const path = "/x/player/wbi/v2" // TODO: Handle WBI signing if necessary
 
+	var finalAidStr string
+
+	if aidStr == "" && bvidStr == "" {
+		return nil, fmt.Errorf("GetVideoProgress requires either aid or bvid")
+	}
+	if cidStr == "" {
+		return nil, fmt.Errorf("GetVideoProgress requires cid")
+	}
+
+	if aidStr != "" {
+		finalAidStr = aidStr
+	} else {
+		// aid 为空，bvid 提供了，需要通过 bvid 获取 aid
+		// 注意：这里会发生一次额外的 API 调用来获取视频视图信息
+		videoView, err := c.GetVideoView(ctx, "", bvidStr) // GetVideoView 接受 ctx
+		if err != nil {
+			return nil, fmt.Errorf("failed to get video info for bvid %s to resolve aid: %w", bvidStr, err)
+		}
+		if videoView == nil || videoView.Aid == 0 {
+			return nil, fmt.Errorf("could not resolve aid from bvid %s: no view data or aid is zero", bvidStr)
+		}
+		finalAidStr = strconv.FormatInt(videoView.Aid, 10)
+	}
+
 	params := url.Values{}
-	params.Set("aid", aid)
-	params.Set("cid", cid)
+	params.Set("aid", finalAidStr)
+	params.Set("cid", cidStr)
 
 	var resp VideoProgressResponse
-	// 注意：这里的 c.Get 方法还没有 context 参数，暂时忽略
-	err := c.Get(path, params, &resp)
+	err := c.Get(path, params, &resp) // c.Get in client.go does not yet take ctx, assumed for now or needs update
 	if err != nil {
-		// 底层 Get 方法已处理 HTTP 和解码错误，这里直接返回
-		// 尝试从错误中提取 Bilibili API 的特定错误信息（如果底层 Get 返回了带有 resp 的错误）
 		if apiErrResp, ok := err.(interface{ GetResponse() *VideoProgressResponse }); ok && apiErrResp.GetResponse() != nil {
 			return nil, fmt.Errorf("bilibili api error: code=%d, message=%s, underlying error: %w",
 				apiErrResp.GetResponse().Code, apiErrResp.GetResponse().Message, err)
 		}
-		return nil, err // 返回通用错误
+		return nil, err
 	}
 
-	// 检查 Bilibili API 返回的业务状态码
 	if resp.Code != 0 {
-		// 返回包含错误信息的响应体，让调用者能看到具体错误
 		return nil, fmt.Errorf("bilibili api error: code=%d, message=%s", resp.Code, resp.Message)
 	}
 
-	// 映射到应用层 DTO
-	// 检查 Data 字段是否存在且有效
 	if resp.Data.LastPlayCid == 0 && resp.Data.LastPlayTime == 0 {
-		// 如果关键进度信息都为 0 或无效，可能表示没有进度记录
-		// 这里返回 nil DTO 和 nil error，由应用层决定如何处理
-		return nil, nil
+		return nil, nil // No progress data, not an error
 	}
 
 	dto := &application.VideoProgressDTO{
