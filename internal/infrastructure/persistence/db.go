@@ -14,11 +14,10 @@ import (
 	"github.com/krisxia0506/bilibili-watcher/internal/domain/model"
 )
 
-// NewDatabaseConnection creates a new GORM database connection for MySQL.
-// 创建新的 MySQL GORM 数据库连接。
+// NewDatabaseConnection 创建新的 MySQL GORM 数据库连接。
 func NewDatabaseConnection(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 
-	// Construct MySQL DSN from config fields
+	// 从配置字段构造 MySQL DSN
 	if cfg.User == "" || cfg.Password == "" || cfg.Host == "" || cfg.DBName == "" {
 		return nil, fmt.Errorf("mysql config incomplete: user, password, host, and dbname are required")
 	}
@@ -31,14 +30,14 @@ func NewDatabaseConnection(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	)
 	dialector := mysql.Open(dsn)
 
-	// GORM logger configuration
+	// GORM 日志记录器配置
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
 		logger.Config{
-			SlowThreshold:             time.Second, // Slow SQL threshold
-			LogLevel:                  logger.Info, // Log level (Silent, Error, Warn, Info)
-			IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound error for logger
-			Colorful:                  true,        // Disable color
+			SlowThreshold:             time.Second, // 慢 SQL 阈值
+			LogLevel:                  logger.Info, // 日志级别 (Silent, Error, Warn, Info)
+			IgnoreRecordNotFoundError: true,        // 忽略 ErrRecordNotFound 错误
+			Colorful:                  true,        // 启用彩色打印
 		},
 	)
 
@@ -50,10 +49,10 @@ func NewDatabaseConnection(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Auto migrate domain models
+	// 自动迁移领域模型
 	err = db.AutoMigrate(
 		&model.VideoProgress{},
-		// Add other models here if needed
+		// 如果需要，在此添加其他模型
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to auto migrate database schemas: %w", err)
