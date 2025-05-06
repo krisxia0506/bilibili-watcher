@@ -2,57 +2,38 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/robfig/cron/v3"
-
-	"github.com/krisxia0506/bilibili-watcher/internal/application"
 )
 
 // Scheduler 管理定时任务。
 type Scheduler struct {
-	cronRunner  *cron.Cron
-	progressSvc *application.VideoProgressService
+	cronRunner *cron.Cron
 }
 
 // NewScheduler 创建一个新的 Scheduler 实例。
-func NewScheduler(progressSvc *application.VideoProgressService) *Scheduler {
+func NewScheduler() *Scheduler {
 	// 使用支持秒字段的 cron runner
 	c := cron.New(cron.WithSeconds())
 	return &Scheduler{
-		cronRunner:  c,
-		progressSvc: progressSvc,
+		cronRunner: c,
 	}
 }
 
-// RegisterJobs 注册定时任务。
-func (s *Scheduler) RegisterJobs(schedule string) error {
-	// 添加获取视频进度的任务
-	_, err := s.cronRunner.AddFunc(schedule, s.runRecordProgressJob)
+// ScheduleJob 注册一个按 cronExpression 定时执行的作业。
+// jobName: 用于日志记录的作业名称。
+// cronExpression: cron 表达式字符串。
+// job: 要执行的无参数函数。
+func (s *Scheduler) ScheduleJob(jobName string, cronExpression string, job func()) error {
+	entryID, err := s.cronRunner.AddFunc(cronExpression, job)
 	if err != nil {
-		log.Printf("Error adding cron job with schedule '%s': %v", schedule, err)
-		return err
+		log.Printf("Error adding cron job '%s' with schedule '%s': %v", jobName, cronExpression, err)
+		return fmt.Errorf("failed to add cron job '%s': %w", jobName, err)
 	}
-	log.Printf("Registered video progress job with schedule: %s", schedule)
+	log.Printf("Scheduled job '%s' (EntryID: %d) with schedule: %s", jobName, entryID, cronExpression)
 	return nil
-}
-
-// runRecordProgressJob 是由 cron job 执行的函数。
-func (s *Scheduler) runRecordProgressJob() {
-	// TODO: 从配置或数据库加载要追踪的视频列表
-	// 暂时硬编码一个目标视频用于测试
-	targetAID := "114102919764678" // 示例 AID
-	targetCID := "28682552616" // 示例 CID
-
-	log.Printf("Cron job starting: FetchAndSaveVideoProgress for AID: %s, CID: %s", targetAID, targetCID)
-	ctx := context.Background() // 为计划任务使用 background context
-	// 调用新的方法，并传入 AID 和 CID
-	err := s.progressSvc.FetchAndSaveVideoProgress(ctx, targetAID, targetCID)
-	if err != nil {
-		// 记录错误，但任务会在下一个计划时间再次运行
-		log.Printf("Error executing FetchAndSaveVideoProgress job for AID %s: %v", targetAID, err)
-	}
-	log.Printf("Cron job finished: FetchAndSaveVideoProgress for AID: %s", targetAID)
 }
 
 // Start 启动 cron 调度器。
