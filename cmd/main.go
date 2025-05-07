@@ -70,16 +70,21 @@ func main() {
 
 	// 定义获取视频进度的作业逻辑
 	fetchVideoProgressJob := func() {
-		// TODO: 将目标 BVID 从配置加载，或从数据库查询需要追踪的视频列表
-		targetBVID := "BV1rT9EYbEJa" // 示例 BVID
+		// 使用配置中加载的目标 BVID
+		targetBVID := cfg.Bilibili.TargetBVID // 从配置获取
+		if targetBVID == "" {        // 双重检查，尽管 LoadConfig 已检查
+			log.Println("Error: WATCH_TARGET_BVID is not configured. Skipping progress fetch job.")
+			return
+		}
+
 		var targetCID int64 = 0
 
 		jobName := fmt.Sprintf("FetchVideoProgress(BVID: %s)", targetBVID)
 		log.Printf("Cron job starting: %s", jobName)
 		ctx := context.Background()
 
-		// 1. 获取视频的 AID 和第一个 CID (如果需要动态获取CID的话)
-		videoView, err := biliClient.GetVideoView(ctx, "", targetBVID) // 通过 BVID 获取视图
+		// 1. 获取视频的 AID 和第一个 CID
+		videoView, err := biliClient.GetVideoView(ctx, "", targetBVID)
 		if err != nil {
 			log.Printf("Error fetching video view for BVID %s in job '%s': %v. Skipping progress fetch.", targetBVID, jobName, err)
 			return
@@ -88,15 +93,14 @@ func main() {
 			log.Printf("No pages found for video BVID %s in job '%s'. Skipping progress fetch.", targetBVID, jobName)
 			return
 		}
-		targetCID = videoView.Pages[0].Cid                  // 使用第一个分P的 CID
+		targetCID = videoView.Pages[0].Cid
 		log.Printf("Determined targetCID: %d for BVID: %s", targetCID, targetBVID)
 
-		// 2. 获取并保存进度，同时传递 AID 和 BVID
-		// VideoProgressService.FetchAndSaveVideoProgress 会优先使用 AID (如果提供)
+		// 2. 获取并保存进度
 		if err := videoProgressService.FetchAndSaveVideoProgress(ctx, "", targetBVID, strconv.FormatInt(targetCID, 10)); err != nil {
 			log.Printf("Error executing FetchAndSaveVideoProgress for  BVID '%s', CID %d in job '%s': %v" , targetBVID, targetCID, jobName, err)
 		}
-		log.Printf("Cron job finished: %s (processed BVID: %s, CID: %d)", jobName, targetBVID, targetCID)
+		log.Printf("Cron job finished: %s (processed BVID: %s, CID: %d)", jobName, targetBVID , targetCID)
 	}
 
 	// 调度作业

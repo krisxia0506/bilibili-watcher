@@ -35,8 +35,8 @@ type DatabaseConfig struct {
 
 // BilibiliConfig 保存 Bilibili API 相关配置。
 type BilibiliConfig struct {
-	UID    string // Env: BILIBILI_UID
-	Cookie string // Env: BILIBILI_COOKIE
+	SessData   string // Env: SESSDATA (Bilibili SESSDATA Cookie, 必需)
+	TargetBVID string // Env: WATCH_TARGET_BVID (用于定时任务的目标 BVID, 必需)
 }
 
 // SchedulerConfig 保存定时任务相关配置。
@@ -57,45 +57,45 @@ func LoadConfig() (*Config, error) {
 	}
 
 	// --- 数据库配置 ---
-	cfg.Database.Host = os.Getenv("DATABASE_HOST")
-	if cfg.Database.Host == "" {
-		return nil, fmt.Errorf("required environment variable DATABASE_HOST is not set")
-	}
-	dbPortStr := getEnv("DATABASE_PORT", "3306")
-	cfg.Database.Port, err = strconv.Atoi(dbPortStr)
+	cfg.Database.Host = getEnvOrErr("DATABASE_HOST")
+	cfg.Database.Port, err = strconv.Atoi(getEnv("DATABASE_PORT", "3306"))
 	if err != nil {
-		return nil, fmt.Errorf("invalid DATABASE_PORT value %q: %w", dbPortStr, err)
+		return nil, fmt.Errorf("invalid DATABASE_PORT value: %w", err)
 	}
-	cfg.Database.User = os.Getenv("DATABASE_USER")
-	if cfg.Database.User == "" {
-		return nil, fmt.Errorf("required environment variable DATABASE_USER is not set")
-	}
-	cfg.Database.Password = os.Getenv("DATABASE_PASSWORD")
-	if cfg.Database.Password == "" {
-		// 允许空密码吗？返回错误可能更安全。
-		return nil, fmt.Errorf("required environment variable DATABASE_PASSWORD is not set")
-	}
-	cfg.Database.DBName = os.Getenv("DATABASE_DBNAME")
-	if cfg.Database.DBName == "" {
-		return nil, fmt.Errorf("required environment variable DATABASE_DBNAME is not set")
-	}
+	cfg.Database.User = getEnvOrErr("DATABASE_USER")
+	cfg.Database.Password = getEnvOrErr("DATABASE_PASSWORD")
+	cfg.Database.DBName = getEnvOrErr("DATABASE_DBNAME")
 
 	// --- Bilibili 配置 ---
-	cfg.Bilibili.UID = os.Getenv("BILIBILI_UID")
-	cfg.Bilibili.Cookie = os.Getenv("BILIBILI_COOKIE")
-	// 如果 UID 和 Cookie 是必需的，添加验证
-	// if cfg.Bilibili.UID == "" {
-	// 	return nil, fmt.Errorf("required environment variable BILIBILI_UID is not set")
-	// }
-	// if cfg.Bilibili.Cookie == "" {
-	// 	return nil, fmt.Errorf("required environment variable BILIBILI_COOKIE is not set")
-	// }
+	cfg.Bilibili.SessData = getEnvOrErr("BILIBILI_SESSDATA")
+	cfg.Bilibili.TargetBVID = getEnvOrErr("BILIBILI_BVID")
 
 	// --- 定时任务配置 ---
 	cfg.Scheduler.Cron = getEnv("SCHEDULER_CRON", "0 0 * * *")
 
 	// --- Gin 模式 ---
 	cfg.GinMode = getEnv("GIN_MODE", "debug")
+
+	// --- 检查必需的环境变量 ---
+	if cfg.Database.Host == "" {
+		return nil, fmt.Errorf("required environment variable DATABASE_HOST is not set")
+	}
+	if cfg.Database.User == "" {
+		return nil, fmt.Errorf("required environment variable DATABASE_USER is not set")
+	}
+	// 允许空密码吗？对于本地开发可能允许，但生产通常不。
+	// if cfg.Database.Password == "" {
+	// 	return nil, fmt.Errorf("required environment variable DATABASE_PASSWORD is not set")
+	// }
+	if cfg.Database.DBName == "" {
+		return nil, fmt.Errorf("required environment variable DATABASE_DBNAME is not set")
+	}
+	if cfg.Bilibili.SessData == "" {
+		return nil, fmt.Errorf("required environment variable SESSDATA is not set")
+	}
+	if cfg.Bilibili.TargetBVID == "" {
+		return nil, fmt.Errorf("required environment variable WATCH_TARGET_BVID is not set")
+	}
 
 	return cfg, nil
 }
@@ -106,4 +106,9 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getEnvOrErr 获取环境变量，如果未设置则返回空字符串。
+func getEnvOrErr(key string) string {
+	return os.Getenv(key)
 }
