@@ -112,6 +112,7 @@ func fromDomain(d *model.VideoProgress) *videoProgressGorm {
 }
 
 // FindByAID 根据 AID 查找视频进度记录。
+// 注意：此方法仍然存在，但其使用场景可能因 FetchAndSaveVideoProgress 的更改而改变。
 func (r *gormVideoProgressRepository) FindByAID(ctx context.Context, aid int64) (*model.VideoProgress, error) {
 	var gormModel videoProgressGorm
 	result := r.db.WithContext(ctx).Where("aid = ?", aid).First(&gormModel)
@@ -124,4 +125,55 @@ func (r *gormVideoProgressRepository) FindByAID(ctx context.Context, aid int64) 
 		return nil, fmt.Errorf("database error finding progress by AID: %w", result.Error)
 	}
 	return gormModel.toDomain(), nil
+}
+
+// ListByAIDAndTimestampRange 获取指定 AID 在给定时间范围内的所有进度记录，按记录时间升序排序。
+func (r *gormVideoProgressRepository) ListByAIDAndTimestampRange(ctx context.Context, aid int64, startTime, endTime time.Time) ([]*model.VideoProgress, error) {
+	var progressesGorm []videoProgressGorm
+	err := r.db.WithContext(ctx).
+		Where("aid = ? AND recorded_at >= ? AND recorded_at <= ?", aid, startTime, endTime).
+		Order("recorded_at ASC").
+		Find(&progressesGorm).Error
+
+	if err != nil {
+		log.Printf("Database error finding video progress by AID %d and time range [%s, %s]: %v", aid, startTime, endTime, err)
+		return nil, fmt.Errorf("database error finding progress by AID and time range: %w", err)
+	}
+
+	domainProgresses := make([]*model.VideoProgress, 0, len(progressesGorm))
+	for _, g := range progressesGorm {
+		domainProgress := g.toDomain()
+		if domainProgress != nil {
+			domainProgresses = append(domainProgresses, domainProgress)
+		}
+	}
+
+	return domainProgresses, nil
+}
+
+// ListByBVIDAndTimestampRange 获取指定 BVID 在给定时间范围内的所有进度记录，按记录时间升序排序。
+func (r *gormVideoProgressRepository) ListByBVIDAndTimestampRange(ctx context.Context, bvid string, startTime, endTime time.Time) ([]*model.VideoProgress, error) {
+	var progressesGorm []videoProgressGorm
+	// 查找 RecordedAt 在 [startTime, endTime] 范围内的记录
+	err := r.db.WithContext(ctx).
+		Where("bvid = ? AND recorded_at >= ? AND recorded_at <= ?", bvid, startTime, endTime).
+		Order("recorded_at ASC"). // 按记录时间升序排序
+		Find(&progressesGorm).Error
+
+	if err != nil {
+		// GORM Find 在未找到时不会返回 ErrRecordNotFound，而是返回空切片和 nil error (在某些版本/场景下), 但仍需检查错误
+		log.Printf("Database error finding video progress by BVID %s and time range [%s, %s]: %v", bvid, startTime, endTime, err)
+		return nil, fmt.Errorf("database error finding progress by BVID and time range: %w", err)
+	}
+
+	// 映射到领域模型
+	domainProgresses := make([]*model.VideoProgress, 0, len(progressesGorm))
+	for _, g := range progressesGorm {
+		domainProgress := g.toDomain() // Ensure toDomain is correct
+		if domainProgress != nil {
+			domainProgresses = append(domainProgresses, domainProgress)
+		}
+	}
+
+	return domainProgresses, nil
 }

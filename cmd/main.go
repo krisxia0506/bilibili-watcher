@@ -11,15 +11,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
-
 	"github.com/krisxia0506/bilibili-watcher/internal/application"
 	"github.com/krisxia0506/bilibili-watcher/internal/config"
 	"github.com/krisxia0506/bilibili-watcher/internal/domain/service"
 	"github.com/krisxia0506/bilibili-watcher/internal/infrastructure/bilibili"
 	"github.com/krisxia0506/bilibili-watcher/internal/infrastructure/persistence"
 	"github.com/krisxia0506/bilibili-watcher/internal/infrastructure/scheduler"
+	"github.com/krisxia0506/bilibili-watcher/internal/interfaces/api/rest"
 )
 
 // main 程序入口
@@ -38,10 +36,8 @@ func main() {
 	log.Println("Successfully connected to the database.")
 
 	// --- 初始化基础设施组件 ---
-	// Bilibili 客户端 (底层 API 交互, 同时实现了 application.BilibiliClient)
-	biliClient := bilibili.NewClient()
+	biliClient := bilibili.NewClient(cfg.Bilibili.SessData)
 	log.Println("Bilibili client initialized.")
-	// Repository 实现
 	videoProgressRepo := persistence.NewGormVideoProgressRepository(db)
 	log.Println("Video progress repository initialized.")
 
@@ -50,29 +46,22 @@ func main() {
 	log.Println("Watch time calculator initialized.")
 
 	// --- 初始化应用服务 ---
-	// VideoProgressService
 	videoProgressService := application.NewVideoProgressService(videoProgressRepo, biliClient)
 	log.Println("Video progress service initialized.")
-	// WatchTimeService
-	watchTimeSvc := application.NewWatchTimeService(biliClient, watchTimeCalculator)
 	log.Println("Watch time service initialized.")
-	// (确保 watchTimeSvc 被使用，否则 linter 会报错。可以在这里或 API handler 中使用它)
-	_ = watchTimeSvc // Placeholder to use watchTimeSvc, remove if used elsewhere
+	videoAnalyticsService := application.NewVideoAnalyticsService(biliClient, videoProgressRepo, watchTimeCalculator)
+	log.Println("Video analytics service initialized.")
 
-	// --- 设置 Gin 和路由 ---
-	gin.SetMode(cfg.GinMode)
-	router := gin.Default()
-	setupRoutes(router, db) // 传入 db 用于潜在的数据库健康检查
-	// TODO: 初始化并注册 Web handlers, 包括可能使用 watchTimeSvc 的 handler
+	// --- 设置 Gin 和路由 (使用新的 rest 包) ---
+	router := rest.SetupRouter(db, cfg.GinMode, videoAnalyticsService /*, other services */)
 
 	// --- 初始化并启动调度器 ---
-	appScheduler := scheduler.NewScheduler() // NewScheduler no longer takes arguments
+	appScheduler := scheduler.NewScheduler()
 
 	// 定义获取视频进度的作业逻辑
 	fetchVideoProgressJob := func() {
-		// 使用配置中加载的目标 BVID
-		targetBVID := cfg.Bilibili.TargetBVID // 从配置获取
-		if targetBVID == "" {        // 双重检查，尽管 LoadConfig 已检查
+		targetBVID := cfg.Bilibili.TargetBVID // 使用 cfg.Bilibili.TargetBVID
+		if targetBVID == "" {
 			log.Println("Error: WATCH_TARGET_BVID is not configured. Skipping progress fetch job.")
 			return
 		}
@@ -98,12 +87,11 @@ func main() {
 
 		// 2. 获取并保存进度
 		if err := videoProgressService.FetchAndSaveVideoProgress(ctx, "", targetBVID, strconv.FormatInt(targetCID, 10)); err != nil {
-			log.Printf("Error executing FetchAndSaveVideoProgress for  BVID '%s', CID %d in job '%s': %v" , targetBVID, targetCID, jobName, err)
+			log.Printf("Error executing FetchAndSaveVideoProgress for  BVID '%s', CID %d in job '%s': %v", targetBVID, targetCID, jobName, err)
 		}
-		log.Printf("Cron job finished: %s (processed BVID: %s, CID: %d)", jobName, targetBVID , targetCID)
+		log.Printf("Cron job finished: %s (processed BVID: %s, CID: %d)", jobName, targetBVID, targetCID)
 	}
 
-	// 调度作业
 	if err := appScheduler.ScheduleJob("FetchVideoProgress", cfg.Scheduler.Cron, fetchVideoProgressJob); err != nil {
 		log.Fatalf("Failed to schedule job 'FetchVideoProgress': %v", err)
 	}
@@ -114,11 +102,12 @@ func main() {
 	serverAddr := fmt.Sprintf(":%d", cfg.Server.Port)
 	srv := &http.Server{
 		Addr:    serverAddr,
-		Handler: router,
+		Handler: router, // 使用 rest.SetupRouter 返回的 router
 	}
 
 	go func() {
 		// 服务连接
+		// 使用 http.Server 的方式是为了支持优雅停机，这是比直接使用 router.Run() 更健壮的做法
 		log.Printf("Starting server on %s", serverAddr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
@@ -127,9 +116,6 @@ func main() {
 
 	// --- 等待中断信号以优雅关闭服务器和调度器 ---
 	quit := make(chan os.Signal, 1)
-	// kill (no param) default send syscall.SIGTERM
-	// kill -2 is syscall.SIGINT
-	// kill -9 is syscall.SIGKILL but can't be catch, so don't need add it
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutting down server...")
@@ -147,33 +133,4 @@ func main() {
 	}
 
 	log.Println("Server exiting")
-}
-
-// setupRoutes 配置 Gin 路由。
-func setupRoutes(router *gin.Engine, db *gorm.DB) {
-	// 健康检查端点
-	router.GET("/health", func(c *gin.Context) {
-		// 简单的健康检查
-		healthStatus := gin.H{"status": "UP"}
-
-		// 检查数据库连接
-		sqlDB, err := db.DB()
-		if err != nil {
-			healthStatus["db"] = "error getting DB instance"
-			c.JSON(http.StatusInternalServerError, healthStatus)
-			return
-		}
-		if err := sqlDB.Ping(); err != nil {
-			healthStatus["db"] = "down"
-			c.JSON(http.StatusServiceUnavailable, healthStatus)
-			return
-		}
-		healthStatus["db"] = "up"
-
-		c.JSON(http.StatusOK, healthStatus)
-	})
-
-	// TODO: 在此添加真实的 API 端点
-	// api := router.Group("/api/v1")
-	// videoProgressHandler.RegisterRoutes(api)
 }

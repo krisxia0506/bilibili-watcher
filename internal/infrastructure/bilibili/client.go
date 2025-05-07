@@ -25,7 +25,8 @@ type Client struct {
 }
 
 // NewClient 创建一个新的 Bilibili API 客户端实例。
-func NewClient() *Client {
+// sessData: 从配置中获取的 SESSDATA cookie 字符串。
+func NewClient(sessData string) *Client {
 	baseURL, _ := url.Parse(apiBaseURL) // Error ignored for constant URL
 	return &Client{
 		httpClient: &http.Client{},

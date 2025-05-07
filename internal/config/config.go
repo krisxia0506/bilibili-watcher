@@ -35,8 +35,8 @@ type DatabaseConfig struct {
 
 // BilibiliConfig 保存 Bilibili API 相关配置。
 type BilibiliConfig struct {
-	SessData   string // Env: SESSDATA (Bilibili SESSDATA Cookie, 必需)
-	TargetBVID string // Env: WATCH_TARGET_BVID (用于定时任务的目标 BVID, 必需)
+	SessData   string // Env: BILIBILI_SESSDATA (Bilibili SESSDATA Cookie, 必需)
+	TargetBVID string // Env: BILIBILI_BVID (用于定时任务的目标 BVID, 必需)
 }
 
 // SchedulerConfig 保存定时任务相关配置。
@@ -50,7 +50,7 @@ func LoadConfig() (*Config, error) {
 	var err error
 
 	// --- 服务器配置 ---
-	serverPortStr := getEnv("SERVER_PORT", "8080")
+	serverPortStr := getEnv("BACKEND_PORT", "8080")
 	cfg.Server.Port, err = strconv.Atoi(serverPortStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid SERVER_PORT value %q: %w", serverPortStr, err)
