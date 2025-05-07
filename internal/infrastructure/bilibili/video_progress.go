@@ -166,7 +166,7 @@ type VideoProgressResponse struct {
 // aidStr (视频稿件 avid) 和 bvidStr (视频稿件 bvid) 必须提供一个。
 // cidStr (视频分P的 ID) 必须提供。
 func (c *Client) GetVideoProgress(ctx context.Context, aidStr, bvidStr, cidStr string) (*application.VideoProgressDTO, error) {
-	const path = "/x/player/wbi/v2" // TODO: Handle WBI signing if necessary
+	const path = "/x/player/wbi/v2"
 
 	var finalAidStr string
 

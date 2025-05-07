@@ -18,6 +18,5 @@
 
 ## 注意
 
-*   当前 `SESSDATA` 是硬编码的，标记为 TODO，未来应改为动态加载。
 *   `GetVideoProgress` 和 `GetVideoView` 共同为 `*Client` 类型添加了方法，使其完整实现了 `application.BilibiliClient` 接口。
 *   错误处理：底层 `Get` 方法处理 HTTP 和解码错误，各个具体的 API 方法 (`GetVideoProgress`, `GetVideoView`) 处理 Bilibili 返回的业务错误码 (`code != 0`)，并将基础设施的响应映射到应用层 DTO 或错误。 

@@ -225,7 +225,7 @@ func (c *Client) GetVideoView(ctx context.Context, aid, bvid string) (*applicati
 		Bvid:      resp.Data.Bvid,
 		Aid:       resp.Data.Aid,
 		Title:     resp.Data.Title,
-		Desc:      resp.Data.Desc, // TODO: Consider using resp.Data.DescV2 for richer description
+		Desc:      resp.Data.Desc, //Consider using resp.Data.DescV2 for richer description
 		Pubdate:   resp.Data.Pubdate,
 		Duration:  resp.Data.Duration,
 		OwnerName: resp.Data.Owner.Name,

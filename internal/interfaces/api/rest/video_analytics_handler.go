@@ -76,7 +76,6 @@ func (h *VideoAnalyticsHandler) GetWatchedSegments(c *gin.Context) {
 	segments, err := h.appService.GetWatchedSegments(c.Request.Context(), req.AID, req.BVID, startTime, endTime, interval)
 	if err != nil {
 		// 根据应用层返回的错误类型决定 HTTP 状态码和业务码
-		// TODO: 更精细的错误处理，例如区分 Not Found 和 Internal Error
 		response.Error(c, http.StatusInternalServerError, response.CodeInternalError, fmt.Sprintf("Failed to calculate watched segments: %v", err))
 		return
 	}

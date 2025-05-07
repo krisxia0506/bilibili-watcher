@@ -55,7 +55,6 @@ func (c *Client) Get(path string, params url.Values, target interface{}) error {
 	if c.sessData != "" {
 		req.Header.Set("Cookie", c.sessData)
 	}
-	// TODO: 可能需要添加 User-Agent 等其他通用 Header
 
 	// 发送请求
 	resp, err := c.httpClient.Do(req)
