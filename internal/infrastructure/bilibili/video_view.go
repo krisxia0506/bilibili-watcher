@@ -186,7 +186,7 @@ func (c *Client) GetVideoView(ctx context.Context, aid, bvid string) (*applicati
 	}
 
 	var resp VideoViewResponse
-	err := c.Get(path, params, &resp)
+	err := c.Get(ctx, path, params, &resp)
 	if err != nil {
 		// 底层 Get 方法已处理 HTTP 和解码错误
 		// 尝试提取 Bilibili API 的特定错误信息

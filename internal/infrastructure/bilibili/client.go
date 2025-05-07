@@ -1,6 +1,7 @@
 package bilibili
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,7 +38,7 @@ func NewClient(sessData string) *Client {
 // path: 相对于 baseURL 的 API 路径 (例如 "/x/web-interface/view")。
 // params: URL 查询参数。
 // target: 用于解码 JSON 响应体的目标结构体指针。
-func (c *Client) Get(path string, params url.Values, target interface{}) error {
+func (c *Client) Get(ctx context.Context, path string, params url.Values, target interface{}) error {
 	// 构建完整的请求 URL
 	requestURL := c.baseURL.ResolveReference(&url.URL{Path: path})
 	if params != nil {
@@ -45,7 +46,7 @@ func (c *Client) Get(path string, params url.Values, target interface{}) error {
 	}
 	log.Printf("Request URL: %s", requestURL.String())
 	// 创建 HTTP GET 请求
-	req, err := http.NewRequest(http.MethodGet, requestURL.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL.String(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create GET request for %s: %w", path, err)
 	}

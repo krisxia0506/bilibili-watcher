@@ -197,7 +197,7 @@ func (c *Client) GetVideoProgress(ctx context.Context, aidStr, bvidStr, cidStr s
 	params.Set("cid", cidStr)
 
 	var resp VideoProgressResponse
-	err := c.Get(path, params, &resp) // c.Get in client.go does not yet take ctx, assumed for now or needs update
+	err := c.Get(ctx, path, params, &resp) // Pass ctx to c.Get
 	if err != nil {
 		if apiErrResp, ok := err.(interface{ GetResponse() *VideoProgressResponse }); ok && apiErrResp.GetResponse() != nil {
 			return nil, fmt.Errorf("bilibili api error: code=%d, message=%s, underlying error: %w",
