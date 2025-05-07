@@ -88,42 +88,49 @@ sequenceDiagram
 *   **表单处理**: [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/)
 *   **包管理器**: [pnpm](https://pnpm.io/) ([web/package.json](mdc:web/package.json), [web/pnpm-lock.yaml](mdc:web/pnpm-lock.yaml))
 
-## 项目结构 (预期)
+## 项目结构
 
-```
+```tree
 .
-├── cmd/                     # 程序入口 (例如: cmd/server/main.go)
-├── configs/                 # 配置文件 (例如: configs/config.yaml)
-├── internal/                # 项目内部代码，不对外暴露
-│   ├── application/         # 应用层: Use Cases, Application Services
-│   ├── domain/              # 领域层: Entities, Value Objects, Domain Events, Repository Interfaces
-│   │   ├── model/           # 领域模型
-│   │   ├── repository/      # 仓储接口定义
-│   │   └── service/         # 领域服务
-│   └── infrastructure/      # 基础设施层:
-│       ├── persistence/     # 持久化实现 (GORM, internal/infrastructure/persistence/db.go)
-│       ├── bilibili/        # Bilibili API 客户端 (internal/infrastructure/bilibili/client.go)
-│       └── web/             # Web 框架适配 (Gin Handlers, Routers, internal/infrastructure/web/router.go)
-├── pkg/                     # 可共享的库代码 (如果需要)
-└── web/                     # 前端 Remix 项目根目录
-    ├── app/                 # Remix 应用核心代码
-    │   ├── routes/          # 路由文件
-    │   ├── components/      # React 组件 (包括 Shadcn UI 组件)
-    │   ├── lib/             # 工具函数、常量等
-    │   ├── styles/          # 全局样式 (Tailwind)
-    │   └── locales/         # i18n 翻译文件
-    ├── public/              # 静态资源
-    ├── package.json         # 前端依赖
-    ├── tsconfig.json        # TypeScript 配置
-    ├── tailwind.config.js   # Tailwind 配置
-    └── remix.config.js      # Remix 配置
-├── .gitignore               # Git 忽略文件配置
-├── go.mod                   # Go 模块定义
-├── go.sum                   # Go 模块校验和
-├── Dockerfile.backend       # 后端 Dockerfile
-├── Dockerfile.frontend      # 前端 Dockerfile
-├── docker-compose.yml       # Docker Compose 配置
-└── .env.example             # 环境变量示例
+├── cmd/                         # 程序入口 (例如: cmd/main.go)
+├── internal/                    # 项目内部代码，不对外暴露
+│   ├── application/             # 应用层: Use Cases, Application Services
+│   ├── config/                  # 配置加载与管理
+│   ├── domain/                  # 领域层: Entities, Value Objects, Domain Events, Repository Interfaces
+│   │   ├── model/               # 领域模型
+│   │   ├── repository/          # 仓储接口定义
+│   │   └── service/             # 领域服务
+│   ├── infrastructure/          # 基础设施层
+│   │   ├── bilibili/            # Bilibili API 客户端实现
+│   │   ├── persistence/         # 持久化实现 (GORM)
+│   │   └── scheduler/           # 定时任务调度器实现
+│   └── interfaces/              # 接口层 (例如 REST API Handlers)
+│       └── api/                 # API 相关
+│           └── rest/            # RESTful API 实现
+│               └── dto/         # API 数据传输对象
+├── pkg/                         # 可共享的库代码 (如果需要，例如通用响应格式)
+│   └── response/                # API 标准响应结构
+├── sql/                         # SQL schema 定义和迁移脚本
+├── web/                         # 前端 Remix 项目根目录
+│   ├── app/                     # Remix 应用核心代码
+│   │   ├── components/          # React 组件 (包括 Shadcn UI 组件)
+│   │   ├── lib/                 # 工具函数、常量等
+│   │   ├── locales/             # i18n 翻译文件
+│   │   ├── routes/              # 路由文件 (例如 _index.tsx)
+│   │   └── styles/              # 全局样式 (Tailwind)
+│   ├── public/                  # 静态资源
+│   ├── .eslintrc.js             # ESLint 配置文件
+│   ├── package.json             # 前端依赖
+│   ├── pnpm-lock.yaml           # pnpm 锁定文件
+│   ├── remix.config.js          # Remix 配置
+│   ├── tailwind.config.js       # Tailwind CSS 配置
+│   └── tsconfig.json            # TypeScript 配置
+├── Dockerfile.backend           # 后端 Dockerfile
+├── Dockerfile.frontend          # 前端 Dockerfile
+├── docker-compose.yml           # Docker Compose 配置
+├── go.mod                       # Go 模块定义
+├── go.sum                       # Go 模块校验和
+└── README.md                    # 项目说明文件
 ```
 
 ## 开发规范
