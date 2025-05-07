@@ -12,8 +12,10 @@
 
 ## 主要组件
 
-*   `client.go`: 定义了 `Client` 结构体和通用的 `Get` 方法。`Client` 负责维护 `http.Client`、基础 URL 和认证信息（如 `SESSDATA`）。`Get` 方法处理通用的 GET 请求逻辑。
-*   `video_progress.go`: 包含 `GetVideoProgress` 方法的实现（作为 `*Client` 的方法）。此方法调用 `/x/player/wbi/v2` API，解析响应，并将其映射到 `application.VideoProgressDTO`。
+*   `client.go`: 定义了 `Client` 结构体和通用的 `Get` 方法。
+    *   `NewClient(sessData string)`: 创建客户端实例，需要传入 `SESSDATA` Cookie。
+    *   `Get`: 处理通用的 GET 请求逻辑。
+*   `video_progress.go`: 包含 `GetVideoProgress` 方法的实现（作为 `*Client` 的方法）。此方法支持通过 AID 或 BVID 获取视频进度（若使用 BVID 会额外调用 `GetVideoView` 获取 AID），并将响应映射到 `application.VideoProgressDTO`。
 *   `video_view.go`: 包含 `GetVideoView` 方法的实现（作为 `*Client` 的方法）。此方法调用 `/x/web-interface/view` API，解析响应，并将其映射到 `application.VideoViewDTO`。
 
 ## 注意

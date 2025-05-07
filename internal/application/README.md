@@ -13,8 +13,12 @@
 ## 主要组件
 
 *   `bilibili_client.go`: 定义了与 Bilibili API 交互的应用层接口 (`BilibiliClient`)。
-*   `bilibili_dto.go`: 定义了用于 Bilibili API 交互的 DTO (`VideoProgressDTO`, `VideoViewDTO`)。
-*   `video_progress_service.go`: 实现了视频进度相关的应用服务 (`VideoProgressService`)，负责编排获取 Bilibili 视频进度、转换数据和保存到仓库的流程。
+*   `bilibili_dto.go`: 定义了用于 Bilibili API 交互的 DTO (`VideoProgressDTO`, `VideoViewDTO`, `VideoViewPageDTO`)。
+*   `video_progress_service.go`: 实现了视频进度相关的应用服务 (`VideoProgressService`)，负责编排获取 Bilibili 视频进度、获取视频总时长、转换数据和保存到仓库（创建新记录）的流程。
+*   `video_analytics_service.go`: 实现了视频分析相关的应用服务 (`VideoAnalyticsService`)。
+    *   定义了 `WatchedSegmentResult` 结构体。
+    *   `GetWatchedSegments`: 协调 Bilibili 客户端获取视频信息、仓库获取进度记录、领域服务计算分段观看时长，并返回结果。
+*   `watch_time_service.go`: (未使用) 实现了计算两个特定时间点之间观看时长的服务。
 
 ## 当前内容
 

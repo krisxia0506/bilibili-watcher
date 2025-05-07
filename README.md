@@ -1,27 +1,67 @@
 # Bilibili Watcher
 
-本项目旨在创建一个 Bilibili 视频观看时长追踪器，记录并分析每日观看时长。
+本项目是一个 Bilibili 视频观看时长追踪与分析工具。旨在帮助用户记录和分析在 Bilibili 观看视频的时长数据，提供数据洞察。
 
 ## 核心功能
 
-1.  **数据获取**: 定时调用 Bilibili API 获取指定用户的视频观看历史和进度。
-2.  **数据存储**: 将每日获取到的观看进度持久化到 MySQL 数据库中。
-3.  **数据分析**: 计算每日的视频观看时长。
-4.  **前端展示**: 通过 Web 界面以折线图等形式展示每日观看时长。
+*   **定时获取进度**: 通过用户配置的 Cron 表达式，定时从 Bilibili API 获取指定UP主最新视频的观看进度。
+*   **数据持久化**: 将获取到的观看进度记录（包括播放时长、分P等信息）存储到 MySQL 数据库中。
+*   **观看时长分析**: 提供 API 接口，用于计算和查询指定时间范围、特定视频（通过 AID 或 BVID）以及时间间隔（如每日、每周）的有效观看时长。
+*   **API 服务**: 基于 Gin 框架提供 RESTful API 接口，方便前端或其他服务调用。
+*   **健康检查**: 提供 `/healthz` 端点，用于监控服务运行状态和数据库连接情况。
 
-## 系统流程
+## 数据处理流程
+
+下图展示了本项目的核心数据处理流程：
 
 ```mermaid
-graph LR
-    A[定时任务触发 （Cron）] --> B{获取视频进度};
-    B --> C[调用 Bilibili API];
-    C --> D{获取成功?};
-    D -- Yes --> E[解析观看时长];
-    E --> F[存储进度到数据库];
-    D -- No --> G[记录错误日志];
-    F --> H[用户访问前端页面];
-    H --> I[从后端 API 获取数据];
-    I --> J[前端展示折线图];
+graph TD
+    A[Bilibili API] -->|视频数据/进度| B(Go 后端服务);
+    B -->|SESSDATA, BVID| C{定时任务调度器};
+    C -- 定时触发 --> D[应用层: VideoProgressService];
+    D -- 调用 --> E[基础设施层: BilibiliClient];
+    E -- HTTP请求 --> A;
+    D -- 获取数据 --> F[领域模型: VideoProgress];
+    F -- 转换 --> G[基础设施层: VideoProgressRepository];
+    G -- GORM操作 --> H[(MySQL 数据库)];
+    I[用户/前端应用] -->|API 请求 （查询观看时长）| J(Go 后端服务: Gin Router);
+    J --> K[接口层: VideoAnalyticsHandler];
+    K --> L[应用层: VideoAnalyticsService];
+    L --> M[领域服务: WatchTimeCalculator];
+    L --> N[基础设施层: VideoProgressRepository];
+    N -- 查询历史进度 --> H;
+    M -- 计算时长 --> L;
+    L -- DTO --> K;
+    K -- JSON响应 --> I;
+```
+
+## 请求处理时序 (获取观看分段时长)
+
+下图展示了用户请求"获取观看分段时长"接口时的主要交互时序：
+
+```mermaid
+sequenceDiagram
+    participant User as 用户/前端
+    participant GinRouter as Gin 路由
+    participant APIHandler as 接口层 Handler
+    participant AppService as 应用层服务
+    participant DomainRepo as 领域仓库
+    participant BiliClient as Bilibili 客户端
+    participant DB as MySQL 数据库
+
+    User->>+GinRouter: POST /api/v1/video/watch-segments (请求体含BVID, 时间范围)
+    GinRouter->>+APIHandler: 路由到 VideoAnalyticsHandler.GetWatchedSegments
+    APIHandler->>+AppService: 调用 VideoAnalyticsService.GetWatchedSegments(ctx, reqDTO)
+    AppService->>+BiliClient: GetVideoView(ctx, bvid) 获取视频信息 (AID, 分P列表等)
+    BiliClient-->>-AppService: 返回 VideoViewDTO
+    AppService->>+DomainRepo: ListByBVIDAndTimestampRange(ctx, bvid, start, end)
+    DomainRepo->>+DB: 执行 SQL 查询历史进度
+    DB-->>-DomainRepo: 返回进度记录列表 (model.VideoProgress)
+    DomainRepo-->>-AppService: 返回领域模型列表
+    AppService->>AppService: (调用领域服务 WatchTimeCalculator) 计算有效观看时长和分段
+    AppService-->>-APIHandler: 返回 WatchSegmentsResultDTO
+    APIHandler-->>-GinRouter: 返回 JSON 响应
+    GinRouter-->>-User: 响应观看时长数据
 ```
 
 ## 技术栈
@@ -34,6 +74,9 @@ graph LR
 *   **数据库**: MySQL 8
 *   **架构**: 领域驱动设计 (DDD)，参考 [go-ddd](https://github.com/sklinkert/go-ddd) 实践。
 *   **依赖管理**: Go Modules ([go.mod](mdc:go.mod), [go.sum](mdc:go.sum))
+*   **配置**: 环境变量
+*   **定时任务**: `robfig/cron/v3`
+*   **部署**: 推荐 Docker + Docker Compose
 
 ### 前端 (Remix)
 

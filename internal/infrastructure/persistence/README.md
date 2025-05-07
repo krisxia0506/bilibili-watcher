@@ -18,7 +18,7 @@
     *   `videoProgressGorm` 结构体: 定义了与 `video_progress` 表对应的 GORM 模型。
     *   `toDomain` / `fromDomain` 函数: 负责在 `videoProgressGorm` 和 `domain/model.VideoProgress` 之间进行转换。
     *   `NewGormVideoProgressRepository`: 创建仓库实例。
-    *   `Save`, `GetLatestByAIDAndCID`, `ListByDateRange`, `FindByAID`: 实现了仓库接口定义的方法，执行具体的 GORM 数据库操作（Create, First, Find）。
+    *   `Save`, `GetLatestByAIDAndCID`, `ListByDateRange`, `FindByAID`, `ListByAIDAndTimestampRange`, `ListByBVIDAndTimestampRange`: 实现了仓库接口定义的方法，执行具体的 GORM 数据库操作。
 
 ## 关键原则
 
@@ -30,4 +30,5 @@
 
 *   仓库的实现应忠于领域层定义的接口契约。
 *   避免在仓库实现中包含业务逻辑；它只应负责数据映射和存储操作。
+*   数据库 Schema ([sql/schema.sql](mdc:sql/schema.sql)) 目前没有对 aid 或 bvid 设置唯一约束，允许存储历史进度。
 *   `AutoMigrate` 功能方便开发，但在生产环境中通常建议使用更专业的数据库迁移工具（如 migrate, flyway 等）配合 SQL 文件 ([sql/schema.sql](mdc:sql/schema.sql)) 进行更可控的数据库模式管理。 
