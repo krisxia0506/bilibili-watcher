@@ -12,8 +12,6 @@ import (
 // Base URLs - Can be extended if needed
 const (
 	apiBaseURL = "https://api.bilibili.com"
-	// TODO: 动态加载 SESSDATA 而不是硬编码
-	sessData = "SESSDATA=a486b214%2C1761995605%2Ce8064%2A51CjAjbbi4oaDoEXCN7yjPThSija81Url7d8duiZqLF-IVReywvw-pC5bbiw4O0IFLqZwSVlZUZ3lDMktiU2NSYTMwYTVqRnoxMmoxRG5jVEVQaVlXb0tzdm1zX1k3VlpKcGQ2aFk2SzMyMVJ5SlNRc1g4MmtNckdkTFp0RjZJM0V0WnpyMnRUMUNBIIEC"
 )
 
 // Client Bilibili API 客户端结构体。
