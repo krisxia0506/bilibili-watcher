@@ -85,19 +85,18 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 	}
 	actualAID := videoView.Aid // 确定视频的 AID 用于后续查询
 
-	// 2. 获取时间范围内的所有进度记录 (+/- 一小段时间 buffer 防止边界问题? 暂时不加)
-	// 为了找到每个区间的起始点，需要查询略微超出 start time 的记录
-	// 查询 [overallStartTime - buffer, overallEndTime] 的记录可能更保险，buffer 可以是 interval
-	// 但更简单的方法是查询整个范围，然后在内存中查找
-	progressRecords, err := s.progressRepo.ListByAIDAndTimestampRange(ctx, actualAID, overallStartTime, overallEndTime)
+	// 2. 获取时间范围内的所有进度记录，增加 buffer
+	// 查询 [overallStartTime - interval, overallEndTime] 的记录
+	queryStartTime := overallStartTime.Add(-interval)
+	log.Printf("Querying progress records for AID %d in range [%s, %s]", actualAID, queryStartTime, overallEndTime)
+	progressRecords, err := s.progressRepo.ListByAIDAndTimestampRange(ctx, actualAID, queryStartTime, overallEndTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list progress records: %w", err)
 	}
-	// 可能还需要查询 overallStartTime 之前的最后一条记录作为初始状态
-	// TODO: 优化查询，只获取必要数据
-	if len(progressRecords) < 1 { // 如果范围内只有0或1条记录，无法计算时长
-		log.Printf("Not enough progress records found for AID %d in range [%s, %s] to calculate duration", actualAID, overallStartTime, overallEndTime)
-		return []WatchedSegmentResult{}, nil // 返回空结果，不是错误
+
+	if len(progressRecords) < 1 { // 如果整个扩展范围内都没有记录，则无法计算
+		log.Printf("No progress records found for AID %d in extended range [%s, %s]", actualAID, queryStartTime, overallEndTime)
+		return []WatchedSegmentResult{}, nil
 	}
 
 	// 3. 按时间间隔处理并计算
@@ -106,21 +105,20 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 
 	for segmentStart.Before(overallEndTime) {
 		segmentEnd := segmentStart.Add(interval)
-		// 确保最后一个分段的结束时间不超过 overallEndTime
 		if segmentEnd.After(overallEndTime) {
 			segmentEnd = overallEndTime
 		}
 
 		// 查找此分段的开始和结束进度记录
 		var startProgress, endProgress *model.VideoProgress
-		// 找到 recorded_at <= segmentStart 的最后一条记录
+		// 找到 recorded_at <= segmentStart 的最后一条记录 (在所有获取到的记录里找)
 		for i := len(progressRecords) - 1; i >= 0; i-- {
 			if !progressRecords[i].RecordedAt.After(segmentStart) {
 				startProgress = progressRecords[i]
 				break
 			}
 		}
-		// 找到 recorded_at <= segmentEnd 的最后一条记录
+		// 找到 recorded_at <= segmentEnd 的最后一条记录 (在所有获取到的记录里找)
 		for i := len(progressRecords) - 1; i >= 0; i-- {
 			if !progressRecords[i].RecordedAt.After(segmentEnd) {
 				endProgress = progressRecords[i]
@@ -131,8 +129,7 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 		var watchedDuration time.Duration
 		var calcErr error
 
-		if startProgress != nil && endProgress != nil && startProgress.ID != endProgress.ID { // 必须是不同的记录
-			// 确保 startProgress 在 endProgress 之前（或同一时间）
+		if startProgress != nil && endProgress != nil && startProgress.ID != endProgress.ID {
 			if !startProgress.RecordedAt.After(endProgress.RecordedAt) {
 				watchedDuration, calcErr = s.calculator.CalculateWatchTime(
 					domainPages,
@@ -142,16 +139,13 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 					endProgress.LastPlayTime/1000, // ms to s
 				)
 				if calcErr != nil {
-					// 记录领域计算错误，但继续处理下一个分段
 					log.Printf("Error calculating watch time for segment [%s, %s], AID %d: %v", segmentStart, segmentEnd, actualAID, calcErr)
-					watchedDuration = 0 // 出错时时长计为0
+					watchedDuration = 0
 				}
 			} else {
-				// 如果 start 在 end 之后，说明这段时间没有有效观看记录
 				watchedDuration = 0
 			}
 		} else {
-			// 没有找到开始或结束记录，或者它们是同一条记录，时长为 0
 			watchedDuration = 0
 		}
 
@@ -161,7 +155,6 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 			WatchedDuration:  watchedDuration,
 		})
 
-		// 移动到下一个分段的开始时间
 		segmentStart = segmentEnd
 	}
 
