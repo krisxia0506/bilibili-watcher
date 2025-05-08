@@ -1,138 +1,265 @@
-import type { MetaFunction } from "@remix-run/node";
+import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { Form, useLoaderData } from "@remix-run/react";
+import { formatISO, startOfDay, endOfDay } from 'date-fns';
+import WatchTimeChart from "~/components/WatchTimeChart";
+
+// 定义 API 响应体中 data.segments 数组元素的类型
+interface WatchSegment {
+  segment_start_time: string;
+  segment_end_time: string;
+  watched_duration_seconds: number;
+}
+
+// 定义 API 响应体类型
+interface WatchSegmentsResponse {
+  code: number;
+  msg: string;
+  data?: {
+    segments: WatchSegment[];
+  };
+}
+
+// 定义 LoaderData 类型
+interface LoaderData {
+  bvid: string;
+  startTime: string;
+  endTime: string;
+  interval: string;
+  segments: WatchSegment[];
+  error?: string;
+  // 添加一个字段来存储请求参数，方便调试时在客户端查看
+  debugRequestParams?: any;
+}
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "New Remix App" },
-    { name: "description", content: "Welcome to Remix!" },
+    { title: "Bilibili Watcher" },
+    { name: "description", content: "Welcome to Bilibili Watcher!" },
   ];
 };
 
+// 后端数据获取逻辑
+export async function loader({ request }: LoaderFunctionArgs) {
+  console.log("[Loader] Received request:", request.url);
+  const url = new URL(request.url);
+  const today = new Date();
+
+  const bvidFromParams = url.searchParams.get("bvid");
+  const startTimeFromParams = url.searchParams.get("startTime");
+  const endTimeFromParams = url.searchParams.get("endTime");
+  const intervalFromParams = url.searchParams.get("interval");
+
+  const bvid = bvidFromParams || "BV1rT9EYbEJa";
+  const interval = intervalFromParams || "1h";
+
+  let finalStartTime: string;
+  let finalEndTime: string;
+
+  if (startTimeFromParams) {
+    // datetime-local input value is typically YYYY-MM-DDTHH:MM (local time)
+    // Append seconds, parse as local Date, then convert to UTC ISO string
+    finalStartTime = new Date(startTimeFromParams + ":00").toISOString();
+  } else {
+    // Default to start of today in UTC
+    finalStartTime = startOfDay(today).toISOString();
+  }
+
+  if (endTimeFromParams) {
+    // datetime-local input value is typically YYYY-MM-DDTHH:MM (local time)
+    finalEndTime = new Date(endTimeFromParams + ":00").toISOString();
+  } else {
+    // Default to end of today in UTC
+    finalEndTime = endOfDay(today).toISOString();
+  }
+
+  const apiRequestBody = {
+    bvid,
+    start_time: finalStartTime,
+    end_time: finalEndTime,
+    interval,
+  };
+  
+  console.log("[Loader] Sending API request with body:", JSON.stringify(apiRequestBody, null, 2));
+
+  try {
+    const response = await fetch("http://localhost:8081/api/v1/video/watch-segments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(apiRequestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Loader] API request failed:", response.status, errorText);
+      return json<LoaderData>({
+        bvid,
+        startTime: finalStartTime,
+        endTime: finalEndTime,
+        interval,
+        segments: [],
+        error: `API request failed: ${response.status} - ${errorText}`,
+        debugRequestParams: apiRequestBody,
+      }, { status: response.status });
+    }
+
+    const result: WatchSegmentsResponse = await response.json();
+    console.log("[Loader] Received API response:", JSON.stringify(result, null, 2));
+
+    if (result.code !== 0) {
+      console.error("[Loader] API business error:", result.msg);
+      return json<LoaderData>({
+        bvid,
+        startTime: finalStartTime,
+        endTime: finalEndTime,
+        interval,
+        segments: [],
+        error: `API error: ${result.msg}`,
+        debugRequestParams: apiRequestBody,
+      });
+    }
+    
+    return json<LoaderData>({
+      bvid,
+      startTime: finalStartTime,
+      endTime: finalEndTime,
+      interval,
+      segments: result.data?.segments || [],
+      debugRequestParams: apiRequestBody,
+    });
+  } catch (error) {
+    let errorMessage = "Failed to fetch watch segments. Please check the console for more details.";
+    if (error instanceof Error) {
+        errorMessage = error.message;
+    }
+    console.error("[Loader] Catch block error:", error);
+    return json<LoaderData>({
+      bvid,
+      startTime: finalStartTime,
+      endTime: finalEndTime,
+      interval,
+      segments: [],
+      error: errorMessage,
+      debugRequestParams: apiRequestBody,
+    }, { status: 500 });
+  }
+}
+
+// 页面组件
 export default function Index() {
+  const { bvid, startTime, endTime, interval, segments, error, debugRequestParams } = useLoaderData<typeof loader>();
+  
+  console.log("[Index Component] Received loader data:", 
+    { bvid, startTime, endTime, interval, segments_count: segments?.length, error, debugRequestParams }
+  );
+
+  const formatDateTimeLocal = (isoString: string): string => {
+    if (!isoString) return "";
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) {
+        // console.warn("Invalid date string for formatDateTimeLocal, returning original:", isoString);
+        return isoString;
+      }
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    } catch (e) {
+      // console.warn("Error formatting date string for formatDateTimeLocal:", isoString, e);
+      return isoString;
+    }
+  };
+
   return (
-    <div className="flex h-screen items-center justify-center">
-      <div className="flex flex-col items-center gap-16">
-        <header className="flex flex-col items-center gap-9">
-          <h1 className="leading text-2xl font-bold text-gray-800 dark:text-gray-100">
-            Welcome to <span className="sr-only">Remix</span>
-          </h1>
-          <div className="h-[144px] w-[434px]">
-            <img
-              src="/logo-light.png"
-              alt="Remix"
-              className="block w-full dark:hidden"
-            />
-            <img
-              src="/logo-dark.png"
-              alt="Remix"
-              className="hidden w-full dark:block"
+    <div className="font-sans p-4 md:p-8 bg-gray-100 min-h-screen">
+      <header className="mb-10">
+        <h1 className="text-3xl md:text-4xl font-bold text-center text-blue-700 tracking-tight">Bilibili Watch Time Statistics</h1>
+      </header>
+
+      {/* Optional: Display debugRequestParams for quick verification on UI */}
+      {/* {debugRequestParams && (
+        <pre className="bg-gray-200 p-2 rounded text-xs mb-4 overflow-auto">
+          Debug Info (Sent to API): {JSON.stringify(debugRequestParams, null, 2)}
+        </pre>
+      )} */}
+
+      <Form method="get" className="mb-10 p-6 bg-white rounded-xl shadow-xl space-y-6 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 items-end">
+          <div>
+            <label htmlFor="bvid" className="block text-sm font-medium text-gray-700 mb-1">BVID:</label>
+            <input
+              type="text"
+              name="bvid"
+              id="bvid"
+              defaultValue={bvid}
+              className="w-full p-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
             />
           </div>
-        </header>
-        <nav className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-gray-200 p-6 dark:border-gray-700">
-          <p className="leading-6 text-gray-700 dark:text-gray-200">
-            What&apos;s next?
-          </p>
-          <ul>
-            {resources.map(({ href, text, icon }) => (
-              <li key={href}>
-                <a
-                  className="group flex items-center gap-3 self-stretch p-3 leading-normal text-blue-700 hover:underline dark:text-blue-500"
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {icon}
-                  {text}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
+          <div>
+            <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 mb-1">Start Time:</label>
+            <input
+              type="datetime-local"
+              name="startTime"
+              id="startTime"
+              defaultValue={formatDateTimeLocal(startTime)}
+              className="w-full p-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+            />
+          </div>
+          <div>
+            <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 mb-1">End Time:</label>
+            <input
+              type="datetime-local"
+              name="endTime"
+              id="endTime"
+              defaultValue={formatDateTimeLocal(endTime)}
+              className="w-full p-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+            />
+          </div>
+          <div>
+            <label htmlFor="interval" className="block text-sm font-medium text-gray-700 mb-1">Interval:</label>
+            <select
+              name="interval"
+              id="interval"
+              defaultValue={interval}
+              className="w-full p-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white"
+            >
+              <option value="10m">10 Minutes</option>
+              <option value="30m">30 Minutes</option>
+              <option value="1h">1 Hour</option>
+              <option value="1d">1 Day</option>
+            </select>
+          </div>
+        </div>
+        <div className="text-center pt-2">
+          <button
+            type="submit"
+            className="px-8 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition duration-150 ease-in-out"
+          >
+            Load Statistics
+          </button>
+        </div>
+      </Form>
+
+      {error && (
+        <div className="mb-10 p-4 bg-red-50 text-red-700 border border-red-300 rounded-lg shadow max-w-4xl mx-auto">
+          <p className="font-semibold text-lg">Error:</p>
+          <p>{error}</p>
+        </div>
+      )}
+
+      <div className="p-4 sm:p-6 bg-white rounded-xl shadow-xl max-w-6xl mx-auto">
+        <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">Watch Durations</h2>
+        <WatchTimeChart segments={segments || []} />
       </div>
+
+      <footer className="mt-16 text-center text-sm text-gray-600">
+        <p>&copy; {new Date().getFullYear()} Bilibili Watcher. All rights reserved.</p>
+      </footer>
     </div>
   );
 }
-
-const resources = [
-  {
-    href: "https://remix.run/start/quickstart",
-    text: "Quick Start (5 min)",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="20"
-        viewBox="0 0 20 20"
-        fill="none"
-        className="stroke-gray-600 group-hover:stroke-current dark:stroke-gray-300"
-      >
-        <path
-          d="M8.51851 12.0741L7.92592 18L15.6296 9.7037L11.4815 7.33333L12.0741 2L4.37036 10.2963L8.51851 12.0741Z"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    href: "https://remix.run/start/tutorial",
-    text: "Tutorial (30 min)",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="20"
-        viewBox="0 0 20 20"
-        fill="none"
-        className="stroke-gray-600 group-hover:stroke-current dark:stroke-gray-300"
-      >
-        <path
-          d="M4.561 12.749L3.15503 14.1549M3.00811 8.99944H1.01978M3.15503 3.84489L4.561 5.2508M8.3107 1.70923L8.3107 3.69749M13.4655 3.84489L12.0595 5.2508M18.1868 17.0974L16.635 18.6491C16.4636 18.8205 16.1858 18.8205 16.0144 18.6491L13.568 16.2028C13.383 16.0178 13.0784 16.0347 12.915 16.239L11.2697 18.2956C11.047 18.5739 10.6029 18.4847 10.505 18.142L7.85215 8.85711C7.75756 8.52603 8.06365 8.21994 8.39472 8.31453L17.6796 10.9673C18.0223 11.0653 18.1115 11.5094 17.8332 11.7321L15.7766 13.3773C15.5723 13.5408 15.5554 13.8454 15.7404 14.0304L18.1868 16.4767C18.3582 16.6481 18.3582 16.926 18.1868 17.0974Z"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    href: "https://remix.run/docs",
-    text: "Remix Docs",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="20"
-        viewBox="0 0 20 20"
-        fill="none"
-        className="stroke-gray-600 group-hover:stroke-current dark:stroke-gray-300"
-      >
-        <path
-          d="M9.99981 10.0751V9.99992M17.4688 17.4688C15.889 19.0485 11.2645 16.9853 7.13958 12.8604C3.01467 8.73546 0.951405 4.11091 2.53116 2.53116C4.11091 0.951405 8.73546 3.01467 12.8604 7.13958C16.9853 11.2645 19.0485 15.889 17.4688 17.4688ZM2.53132 17.4688C0.951566 15.8891 3.01483 11.2645 7.13974 7.13963C11.2647 3.01471 15.8892 0.951453 17.469 2.53121C19.0487 4.11096 16.9854 8.73551 12.8605 12.8604C8.73562 16.9853 4.11107 19.0486 2.53132 17.4688Z"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    href: "https://rmx.as/discord",
-    text: "Join Discord",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="20"
-        viewBox="0 0 24 20"
-        fill="none"
-        className="stroke-gray-600 group-hover:stroke-current dark:stroke-gray-300"
-      >
-        <path
-          d="M15.0686 1.25995L14.5477 1.17423L14.2913 1.63578C14.1754 1.84439 14.0545 2.08275 13.9422 2.31963C12.6461 2.16488 11.3406 2.16505 10.0445 2.32014C9.92822 2.08178 9.80478 1.84975 9.67412 1.62413L9.41449 1.17584L8.90333 1.25995C7.33547 1.51794 5.80717 1.99419 4.37748 2.66939L4.19 2.75793L4.07461 2.93019C1.23864 7.16437 0.46302 11.3053 0.838165 15.3924L0.868838 15.7266L1.13844 15.9264C2.81818 17.1714 4.68053 18.1233 6.68582 18.719L7.18892 18.8684L7.50166 18.4469C7.96179 17.8268 8.36504 17.1824 8.709 16.4944L8.71099 16.4904C10.8645 17.0471 13.128 17.0485 15.2821 16.4947C15.6261 17.1826 16.0293 17.8269 16.4892 18.4469L16.805 18.8725L17.3116 18.717C19.3056 18.105 21.1876 17.1751 22.8559 15.9238L23.1224 15.724L23.1528 15.3923C23.5873 10.6524 22.3579 6.53306 19.8947 2.90714L19.7759 2.73227L19.5833 2.64518C18.1437 1.99439 16.6386 1.51826 15.0686 1.25995ZM16.6074 10.7755L16.6074 10.7756C16.5934 11.6409 16.0212 12.1444 15.4783 12.1444C14.9297 12.1444 14.3493 11.6173 14.3493 10.7877C14.3493 9.94885 14.9378 9.41192 15.4783 9.41192C16.0471 9.41192 16.6209 9.93851 16.6074 10.7755ZM8.49373 12.1444C7.94513 12.1444 7.36471 11.6173 7.36471 10.7877C7.36471 9.94885 7.95323 9.41192 8.49373 9.41192C9.06038 9.41192 9.63892 9.93712 9.6417 10.7815C9.62517 11.6239 9.05462 12.1444 8.49373 12.1444Z"
-          strokeWidth="1.5"
-        />
-      </svg>
-    ),
-  },
-];
