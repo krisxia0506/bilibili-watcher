@@ -3,6 +3,8 @@ package rest
 import (
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -65,10 +67,25 @@ func (h *VideoAnalyticsHandler) GetWatchedSegments(c *gin.Context) {
 	}
 
 	// 解析时间间隔字符串
-	interval, err := time.ParseDuration(req.Interval)
+	var interval time.Duration
+	intervalStr := req.Interval
+
+	if strings.HasSuffix(intervalStr, "d") {
+		// 如果单位是 'd' (天)
+		daysStr := strings.TrimSuffix(intervalStr, "d")
+		days, parseErr := strconv.Atoi(daysStr)
+		if parseErr != nil {
+			response.Error(c, http.StatusBadRequest, response.CodeInvalidParams, fmt.Sprintf("Invalid interval format (days): %v", parseErr))
+			return
+		}
+		// 将天转换为小时，再用 time.ParseDuration 解析
+		intervalStr = fmt.Sprintf("%dh", days*24)
+	}
+
+	interval, err = time.ParseDuration(intervalStr)
 	if err != nil {
-		// 这通常不应该发生，因为 gin binding `oneof` 已经校验了
-		response.Error(c, http.StatusBadRequest, response.CodeInvalidParams, fmt.Sprintf("Invalid interval format: %v", err))
+		// 如果转换后或原始格式仍然无效 (例如，gin binding oneof 漏掉了某些校验)
+		response.Error(c, http.StatusBadRequest, response.CodeInvalidParams, fmt.Sprintf("Invalid interval format: %v for input '%s' (parsed as '%s')", err, req.Interval, intervalStr))
 		return
 	}
 
