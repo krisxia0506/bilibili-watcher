@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { Form, useLoaderData } from "@remix-run/react";
-import { formatISO, startOfDay, endOfDay } from 'date-fns';
+import { Form, useLoaderData, useSubmit } from "@remix-run/react";
+import { useEffect, useRef, useCallback } from "react";
 import WatchTimeChart from "~/components/WatchTimeChart";
 
 // 定义 API 响应体中 data.segments 数组元素的类型
@@ -23,8 +23,8 @@ interface WatchSegmentsResponse {
 // 定义 LoaderData 类型
 interface LoaderData {
   bvid: string;
-  startTime: string;
-  endTime: string;
+  startTime: string | null;
+  endTime: string | null;
   interval: string;
   segments: WatchSegment[];
   error?: string;
@@ -43,137 +43,191 @@ export const meta: MetaFunction = () => {
 export async function loader({ request }: LoaderFunctionArgs) {
   console.log("[Loader] Received request:", request.url);
   const url = new URL(request.url);
-  const today = new Date();
 
   const bvidFromParams = url.searchParams.get("bvid");
-  const startTimeFromParams = url.searchParams.get("startTime");
-  const endTimeFromParams = url.searchParams.get("endTime");
+  const startTimeFromParams = url.searchParams.get("startTime"); // Expected to be UTC ISO string from client
+  const endTimeFromParams = url.searchParams.get("endTime");     // Expected to be UTC ISO string from client
   const intervalFromParams = url.searchParams.get("interval");
 
   const bvid = bvidFromParams || "BV1rT9EYbEJa";
   const interval = intervalFromParams || "1h";
 
-  let finalStartTime: string;
-  let finalEndTime: string;
-
-  if (startTimeFromParams) {
-    // datetime-local input value is typically YYYY-MM-DDTHH:MM (local time)
-    // Append seconds, parse as local Date, then convert to UTC ISO string
-    finalStartTime = new Date(startTimeFromParams + ":00").toISOString();
-  } else {
-    // Default to start of today in UTC
-    finalStartTime = startOfDay(today).toISOString();
-  }
-
-  if (endTimeFromParams) {
-    // datetime-local input value is typically YYYY-MM-DDTHH:MM (local time)
-    finalEndTime = new Date(endTimeFromParams + ":00").toISOString();
-  } else {
-    // Default to end of today in UTC
-    finalEndTime = endOfDay(today).toISOString();
-  }
-
-  const apiRequestBody = {
-    bvid,
-    start_time: finalStartTime,
-    end_time: finalEndTime,
-    interval,
-  };
+  // Now directly use params if they exist, assuming client sent UTC ISO
+  const finalStartTimeForApi: string | null = startTimeFromParams || null;
+  const finalEndTimeForApi: string | null = endTimeFromParams || null;
   
-  console.log("[Loader] Sending API request with body:", JSON.stringify(apiRequestBody, null, 2));
+  // Pass back the same UTC ISO strings (or null) to client
+  const startTimeForClientDisplay: string | null = finalStartTimeForApi;
+  const endTimeForClientDisplay: string | null = finalEndTimeForApi;
 
-  try {
-    const response = await fetch("http://localhost:8081/api/v1/video/watch-segments", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(apiRequestBody),
-    });
+  const apiRequestBody = (finalStartTimeForApi && finalEndTimeForApi) ? {
+    bvid,
+    start_time: finalStartTimeForApi,
+    end_time: finalEndTimeForApi,
+    interval,
+  } : null;
+  
+  let segments: WatchSegment[] = [];
+  let apiError: string | undefined = undefined;
+  const backendApiBaseUrl = typeof process !== 'undefined' && process.env.BACKEND_API_URL ? process.env.BACKEND_API_URL : "http://localhost:8081";
+  const apiUrl = `${backendApiBaseUrl}/api/v1/video/watch-segments`;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Loader] API request failed:", response.status, errorText);
-      return json<LoaderData>({
-        bvid,
-        startTime: finalStartTime,
-        endTime: finalEndTime,
-        interval,
-        segments: [],
-        error: `API request failed: ${response.status} - ${errorText}`,
-        debugRequestParams: apiRequestBody,
-      }, { status: response.status });
-    }
-
-    const result: WatchSegmentsResponse = await response.json();
-    console.log("[Loader] Received API response:", JSON.stringify(result, null, 2));
-
-    if (result.code !== 0) {
-      console.error("[Loader] API business error:", result.msg);
-      return json<LoaderData>({
-        bvid,
-        startTime: finalStartTime,
-        endTime: finalEndTime,
-        interval,
-        segments: [],
-        error: `API error: ${result.msg}`,
-        debugRequestParams: apiRequestBody,
+  if (apiRequestBody) {
+    console.log(`[Loader] API Request Body for ${apiUrl}:`, JSON.stringify(apiRequestBody, null, 2));
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(apiRequestBody),
       });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[Loader] API request failed:", response.status, errorText);
+        apiError = `API request failed: ${response.status} - ${errorText}`;
+      } else {
+        const result: WatchSegmentsResponse = await response.json();
+        console.log("[Loader] Received API response:", JSON.stringify(result, null, 2));
+        if (result.code !== 0) {
+          console.error("[Loader] API business error:", result.msg);
+          apiError = `API error: ${result.msg}`;
+        } else {
+          segments = result.data?.segments || [];
+        }
+      }
+    } catch (error) {
+      let errorMessage = "Failed to fetch watch segments.";
+      if (error instanceof Error) { errorMessage = error.message; }
+      console.error("[Loader] Catch block error:", error);
+      apiError = errorMessage;
     }
-    
-    return json<LoaderData>({
-      bvid,
-      startTime: finalStartTime,
-      endTime: finalEndTime,
-      interval,
-      segments: result.data?.segments || [],
-      debugRequestParams: apiRequestBody,
-    });
-  } catch (error) {
-    let errorMessage = "Failed to fetch watch segments. Please check the console for more details.";
-    if (error instanceof Error) {
-        errorMessage = error.message;
-    }
-    console.error("[Loader] Catch block error:", error);
-    return json<LoaderData>({
-      bvid,
-      startTime: finalStartTime,
-      endTime: finalEndTime,
-      interval,
-      segments: [],
-      error: errorMessage,
-      debugRequestParams: apiRequestBody,
-    }, { status: 500 });
+  } else {
+    console.log("[Loader] startTime or endTime missing or invalid in URL query, skipping API call.");
   }
+  
+  return json<LoaderData>({
+    bvid,
+    startTime: startTimeForClientDisplay,
+    endTime: endTimeForClientDisplay,
+    interval,
+    segments,
+    error: apiError,
+    debugRequestParams: apiRequestBody, 
+  });
 }
 
 // 页面组件
 export default function Index() {
-  const { bvid, startTime, endTime, interval, segments, error, debugRequestParams } = useLoaderData<typeof loader>();
+  const { bvid, startTime: startTimeFromLoader, endTime: endTimeFromLoader, interval, segments, error } = useLoaderData<typeof loader>();
+  const submit = useSubmit();
+  const formRef = useRef<HTMLFormElement>(null);
   
   console.log("[Index Component] Received loader data:", 
-    { bvid, startTime, endTime, interval, segments_count: segments?.length, error, debugRequestParams }
+    { bvid, startTime: startTimeFromLoader, endTime: endTimeFromLoader, interval, segments_count: segments?.length, error }
   );
 
-  const formatDateTimeLocal = (isoString: string): string => {
+  // Converts a Date object to 'YYYY-MM-DDTHH:MM' string for datetime-local input
+  const formatLocalDateToInputString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  // Converts a UTC ISO string (from loader, if present) to 'YYYY-MM-DDTHH:MM' local string for datetime-local input
+  const formatUtcIsoToLocalInputString = (isoString: string): string => {
     if (!isoString) return "";
     try {
-      const date = new Date(isoString);
-      if (isNaN(date.getTime())) {
-        // console.warn("Invalid date string for formatDateTimeLocal, returning original:", isoString);
-        return isoString;
-      }
-      const year = date.getFullYear();
-      const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      const day = date.getDate().toString().padStart(2, '0');
-      const hours = date.getHours().toString().padStart(2, '0');
-      const minutes = date.getMinutes().toString().padStart(2, '0');
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
+      const date = new Date(isoString); // Converts UTC ISO to local Date object
+      if (isNaN(date.getTime())) return isoString;
+      return formatLocalDateToInputString(date); // Then format this local Date object
     } catch (e) {
-      // console.warn("Error formatting date string for formatDateTimeLocal:", isoString, e);
       return isoString;
     }
   };
+
+  // Calculate initial values for the uncontrolled inputs
+  let initialStartTimeForInput: string;
+  let initialEndTimeForInput: string;
+  if (startTimeFromLoader && endTimeFromLoader) {
+    initialStartTimeForInput = formatUtcIsoToLocalInputString(startTimeFromLoader);
+    initialEndTimeForInput = formatUtcIsoToLocalInputString(endTimeFromLoader);
+  } else {
+    const todayClient = new Date();
+    const clientStartOfDay = new Date(todayClient.getFullYear(), todayClient.getMonth(), todayClient.getDate(), 0, 0, 0, 0);
+    const clientEndOfDay = new Date(todayClient.getFullYear(), todayClient.getMonth(), todayClient.getDate(), 23, 59, 59, 999);
+    initialStartTimeForInput = formatLocalDateToInputString(clientStartOfDay);
+    initialEndTimeForInput = formatLocalDateToInputString(clientEndOfDay);
+  }
+
+  // Centralized submit logic with UTC conversion
+  const handleSubmit = useCallback((formData: FormData) => {
+    const startTimeLocal = formData.get("startTime") as string;
+    const endTimeLocal = formData.get("endTime") as string;
+    const bvidValue = formData.get("bvid") as string || "BV1rT9EYbEJa";
+    const intervalValue = formData.get("interval") as string || "1h";
+    
+    let startTimeUtcIso: string | null = null;
+    let endTimeUtcIso: string | null = null;
+
+    if (startTimeLocal) {
+      try {
+        // Append seconds and convert the local time string to UTC ISO
+        startTimeUtcIso = new Date(startTimeLocal + ":00").toISOString();
+      } catch (e) {
+        console.error("Error parsing start time:", startTimeLocal, e);
+        // Optionally handle error, e.g., show validation message
+      }
+    }
+    if (endTimeLocal) {
+      try {
+        // Append seconds and convert the local time string to UTC ISO
+        endTimeUtcIso = new Date(endTimeLocal + ":00").toISOString();
+      } catch (e) {
+        console.error("Error parsing end time:", endTimeLocal, e);
+        // Optionally handle error
+      }
+    }
+    
+    if (startTimeUtcIso && endTimeUtcIso) {
+      const params = new URLSearchParams();
+      params.append("bvid", bvidValue);
+      params.append("interval", intervalValue);
+      params.append("startTime", startTimeUtcIso);
+      params.append("endTime", endTimeUtcIso);
+      
+      console.log("[Index Component] Submitting with client-converted UTC params:", params.toString());
+      submit(params, { method: "get", replace: false }); // Use replace: false for manual submits
+    } else {
+      console.warn("Invalid date/time input, submission aborted.");
+      // Optionally provide user feedback
+    }
+  }, [submit]);
+
+  // Handle manual form submission
+  const handleFormSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); // Prevent default GET submission
+    const formData = new FormData(event.currentTarget);
+    handleSubmit(formData);
+  }, [handleSubmit]);
+
+  // Handle automatic submission on initial load
+  useEffect(() => {
+    if (
+      startTimeFromLoader === null &&
+      endTimeFromLoader === null &&
+      segments && segments.length === 0 &&
+      !error &&
+      formRef.current // Ensure form is mounted
+    ) {
+      console.log("[Index Component] Initial load: Triggering submit with client defaults.");
+      // Create FormData from the current form state which has the client default values
+      const initialFormData = new FormData(formRef.current);
+      handleSubmit(initialFormData); // Use the centralized handler for UTC conversion
+    }
+    // Dependencies updated slightly
+  }, [startTimeFromLoader, endTimeFromLoader, segments, error, handleSubmit]);
 
   return (
     <div className="font-sans p-4 md:p-8 bg-gray-100 dark:bg-gray-800 min-h-screen">
@@ -188,7 +242,7 @@ export default function Index() {
         </pre>
       )} */}
 
-      <Form method="get" className="mb-10 p-6 bg-white dark:bg-gray-700 rounded-xl shadow-xl space-y-6 max-w-4xl mx-auto">
+      <Form ref={formRef} method="get" onSubmit={handleFormSubmit} className="mb-10 p-6 bg-white dark:bg-gray-700 rounded-xl shadow-xl space-y-6 max-w-4xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 items-end">
           <div>
             <label htmlFor="bvid" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">BVID:</label>
@@ -206,7 +260,8 @@ export default function Index() {
               type="datetime-local"
               name="startTime"
               id="startTime"
-              defaultValue={formatDateTimeLocal(startTime)}
+              defaultValue={initialStartTimeForInput}
+              required
               className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
@@ -216,7 +271,8 @@ export default function Index() {
               type="datetime-local"
               name="endTime"
               id="endTime"
-              defaultValue={formatDateTimeLocal(endTime)}
+              defaultValue={initialEndTimeForInput}
+              required
               className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
             />
           </div>

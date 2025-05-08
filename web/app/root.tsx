@@ -30,11 +30,18 @@ function InnerLayout({ children }: { children: React.ReactNode }) {
     setTheme((prevTheme) => (prevTheme === "dark" ? "light" : "dark"));
   };
 
+  // Determine theme colors for meta tag
+  // These should match your actual body background colors for light and dark modes
+  const lightThemeColor = "#ffffff"; // Assuming body bg-white in light mode
+  const darkThemeColor = "#111827";  // Assuming body dark:bg-gray-900 in dark mode
+
   return (
     <html lang="en" className={typeof window !== 'undefined' ? document.documentElement.className : 'light'}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Dynamically set theme-color based on the current theme */}
+        <meta name="theme-color" content={theme === 'dark' ? darkThemeColor : lightThemeColor} />
         <Meta />
         <Links />
       </head>
