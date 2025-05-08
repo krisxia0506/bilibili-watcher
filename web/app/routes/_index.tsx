@@ -176,9 +176,9 @@ export default function Index() {
   };
 
   return (
-    <div className="font-sans p-4 md:p-8 bg-gray-100 min-h-screen">
+    <div className="font-sans p-4 md:p-8 bg-gray-100 dark:bg-gray-800 min-h-screen">
       <header className="mb-10">
-        <h1 className="text-3xl md:text-4xl font-bold text-center text-blue-700 tracking-tight">Bilibili Watch Time Statistics</h1>
+        <h1 className="text-3xl md:text-4xl font-bold text-center text-blue-700 dark:text-blue-500 tracking-tight">Bilibili Watch Time Statistics</h1>
       </header>
 
       {/* Optional: Display debugRequestParams for quick verification on UI */}
@@ -188,57 +188,57 @@ export default function Index() {
         </pre>
       )} */}
 
-      <Form method="get" className="mb-10 p-6 bg-white rounded-xl shadow-xl space-y-6 max-w-4xl mx-auto">
+      <Form method="get" className="mb-10 p-6 bg-white dark:bg-gray-700 rounded-xl shadow-xl space-y-6 max-w-4xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 items-end">
           <div>
-            <label htmlFor="bvid" className="block text-sm font-medium text-gray-700 mb-1">BVID:</label>
+            <label htmlFor="bvid" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">BVID:</label>
             <input
               type="text"
               name="bvid"
               id="bvid"
               defaultValue={bvid}
-              className="w-full p-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+              className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
           <div>
-            <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 mb-1">Start Time:</label>
+            <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Time:</label>
             <input
               type="datetime-local"
               name="startTime"
               id="startTime"
               defaultValue={formatDateTimeLocal(startTime)}
-              className="w-full p-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+              className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
           <div>
-            <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 mb-1">End Time:</label>
+            <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Time:</label>
             <input
               type="datetime-local"
               name="endTime"
               id="endTime"
               defaultValue={formatDateTimeLocal(endTime)}
-              className="w-full p-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+              className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
           <div>
-            <label htmlFor="interval" className="block text-sm font-medium text-gray-700 mb-1">Interval:</label>
+            <label htmlFor="interval" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Interval:</label>
             <select
               name="interval"
               id="interval"
               defaultValue={interval}
-              className="w-full p-2.5 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white"
+              className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
             >
-              <option value="10m">10 Minutes</option>
-              <option value="30m">30 Minutes</option>
-              <option value="1h">1 Hour</option>
-              <option value="1d">1 Day</option>
+              <option value="10m" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">10 Minutes</option>
+              <option value="30m" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">30 Minutes</option>
+              <option value="1h" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">1 Hour</option>
+              <option value="1d" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">1 Day</option>
             </select>
           </div>
         </div>
         <div className="text-center pt-2">
           <button
             type="submit"
-            className="px-8 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition duration-150 ease-in-out"
+            className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition duration-150 ease-in-out"
           >
             Load Statistics
           </button>
@@ -246,18 +246,18 @@ export default function Index() {
       </Form>
 
       {error && (
-        <div className="mb-10 p-4 bg-red-50 text-red-700 border border-red-300 rounded-lg shadow max-w-4xl mx-auto">
+        <div className="mb-10 p-4 bg-red-50 dark:bg-red-900 dark:bg-opacity-30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700 rounded-lg shadow max-w-4xl mx-auto">
           <p className="font-semibold text-lg">Error:</p>
           <p>{error}</p>
         </div>
       )}
 
-      <div className="p-4 sm:p-6 bg-white rounded-xl shadow-xl max-w-6xl mx-auto">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-6 text-center">Watch Durations</h2>
+      <div className="p-4 sm:p-6 bg-white dark:bg-gray-700 rounded-xl shadow-xl max-w-6xl mx-auto">
+        <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-6 text-center">Watch Durations</h2>
         <WatchTimeChart segments={segments || []} />
       </div>
 
-      <footer className="mt-16 text-center text-sm text-gray-600">
+      <footer className="mt-16 text-center text-sm text-gray-600 dark:text-gray-400">
         <p>&copy; {new Date().getFullYear()} Bilibili Watcher. All rights reserved.</p>
       </footer>
     </div>
