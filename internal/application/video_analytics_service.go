@@ -109,19 +109,18 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 			segmentEnd = overallEndTime
 		}
 
-		// 查找此分段的开始和结束进度记录
-		var startProgress, endProgress *model.VideoProgress
-		// 找到 recorded_at <= segmentStart 的最后一条记录 (在所有获取到的记录里找)
+		var p1 *model.VideoProgress // Represents state at/before segmentStart
 		for i := len(progressRecords) - 1; i >= 0; i-- {
 			if !progressRecords[i].RecordedAt.After(segmentStart) {
-				startProgress = progressRecords[i]
+				p1 = progressRecords[i]
 				break
 			}
 		}
-		// 找到 recorded_at <= segmentEnd 的最后一条记录 (在所有获取到的记录里找)
+
+		var p2 *model.VideoProgress // Represents state at/before segmentEnd
 		for i := len(progressRecords) - 1; i >= 0; i-- {
 			if !progressRecords[i].RecordedAt.After(segmentEnd) {
-				endProgress = progressRecords[i]
+				p2 = progressRecords[i]
 				break
 			}
 		}
@@ -129,24 +128,60 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 		var watchedDuration time.Duration
 		var calcErr error
 
-		if startProgress != nil && endProgress != nil && startProgress.ID != endProgress.ID {
-			if !startProgress.RecordedAt.After(endProgress.RecordedAt) {
-				watchedDuration, calcErr = s.calculator.CalculateWatchTime(
-					domainPages,
-					startProgress.LastPlayCID,
-					startProgress.LastPlayTime/1000, // ms to s
-					endProgress.LastPlayCID,
-					endProgress.LastPlayTime/1000, // ms to s
-				)
-				if calcErr != nil {
-					log.Printf("Error calculating watch time for segment [%s, %s], AID %d: %v", segmentStart, segmentEnd, actualAID, calcErr)
+		if p2 == nil {
+			// No records at or before segmentEnd. No activity relevant to the end of this segment.
+			watchedDuration = 0
+		} else if p1 == nil {
+			// No record at or before segmentStart. All records in progressRecords are > segmentStart.
+			// Playback, if any for this segment, started *after* segmentStart.
+			// p2 is the last known state within this segment (or at its end).
+			if len(progressRecords) == 0 { // Should have been caught by earlier check, but defensive.
+				watchedDuration = 0
+			} else {
+				actualStartPointForCalc := progressRecords[0] // Earliest record, must be > segmentStart
+
+				// Ensure this actualStartPointForCalc is relevant for the segment ending at p2.RecordedAt
+				// and it must occur before or at p2, and start before segmentEnd.
+				if !actualStartPointForCalc.RecordedAt.After(p2.RecordedAt) && actualStartPointForCalc.RecordedAt.Before(segmentEnd) {
+					watchedDuration, calcErr = s.calculator.CalculateWatchTime(
+						domainPages,
+						actualStartPointForCalc.LastPlayCID,
+						actualStartPointForCalc.LastPlayTime/1000, // ms to s
+						p2.LastPlayCID,
+						p2.LastPlayTime/1000, // ms to s
+					)
+					if calcErr != nil {
+						log.Printf("Error calculating watch time (p1 nil case) for segment [%s, %s], AID %d: %v. ActualStart: %+v, P2: %+v",
+							segmentStart, segmentEnd, actualAID, calcErr, actualStartPointForCalc, p2)
+						watchedDuration = 0
+					}
+				} else {
+					// actualStartPointForCalc is either after p2 or not meaningfully before segmentEnd.
 					watchedDuration = 0
 				}
-			} else {
+			}
+		} else if p1.ID == p2.ID {
+			// The same record defines the state at segmentStart and segmentEnd boundary checks.
+			// This implies no new progress records fell strictly within (p1.RecordedAt, segmentEnd) that would change p2.
+			watchedDuration = 0
+		} else if p1.RecordedAt.After(p2.RecordedAt) {
+			log.Printf("Data integrity concern: p1.RecordedAt (%v) is after p2.RecordedAt (%v) for segment [%s, %s]",
+				p1.RecordedAt, p2.RecordedAt, segmentStart, segmentEnd)
+			watchedDuration = 0
+		} else {
+			// Normal case: p1 and p2 are valid, distinct, and p1 is not after p2.
+			watchedDuration, calcErr = s.calculator.CalculateWatchTime(
+				domainPages,
+				p1.LastPlayCID,
+				p1.LastPlayTime/1000, // ms to s
+				p2.LastPlayCID,
+				p2.LastPlayTime/1000, // ms to s
+			)
+			if calcErr != nil {
+				log.Printf("Error calculating watch time (normal case) for segment [%s, %s], AID %d: %v. P1: %+v, P2: %+v",
+					segmentStart, segmentEnd, actualAID, calcErr, p1, p2)
 				watchedDuration = 0
 			}
-		} else {
-			watchedDuration = 0
 		}
 
 		results = append(results, WatchedSegmentResult{
