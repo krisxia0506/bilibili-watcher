@@ -1,4 +1,7 @@
-# Bilibili Watcher
+<div align="center">
+<h1>Bilibili Watcher</h1>
+<img src="https://github.com/user-attachments/assets/b6d55b43-a2b9-452b-98b2-958a1a3ec4a9" width="300" />
+</div>
 
 本项目是一个 Bilibili 视频观看时长追踪与分析工具。旨在帮助用户记录和分析在 Bilibili 观看视频的时长数据，提供数据洞察。
 
