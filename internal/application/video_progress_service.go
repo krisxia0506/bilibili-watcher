@@ -39,6 +39,7 @@ func (s *VideoProgressService) FetchAndSaveVideoProgress(ctx context.Context, ai
 
 	if progressDTO == nil {
 		log.Printf("No valid progress data returned from Bilibili API (AID: '%s', BVID: '%s', CID: '%s'). Skipping save.", aidStr, bvidStr, cidStr)
+		log.Printf("SESSDATA maybe expired")
 		return nil
 	}
 
