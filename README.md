@@ -4,6 +4,11 @@
 </div>
 
 本项目是一个 Bilibili 视频观看时长追踪与分析工具。旨在帮助用户记录和分析在 Bilibili 观看视频的时长数据，提供数据洞察。
+## 使用截图
+|Light|Dark|
+|----|----|
+|![image](https://github.com/user-attachments/assets/0734d91c-ab09-4109-8539-fd1ca38c1a6d)|![image](https://github.com/user-attachments/assets/067b1484-021a-48fe-a360-28e590a9bfb2)|
+
 
 ## 核心功能
 
