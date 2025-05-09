@@ -28,6 +28,8 @@ services:
     environment: 
       # 前端需要访问的后端 API 地址
       - BACKEND_API_URL=http://backend:${BACKEND_PORT:-8080}
+      # Add BILIBILI_BVID environment variable with a default fallback
+      - BILIBILI_BVID=${BILIBILI_BVID:-BV1rT9EYbEJa}
     networks:
       - bilibili-watcher-net
     depends_on:

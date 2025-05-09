@@ -44,12 +44,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
   console.log("[Loader] Received request:", request.url);
   const url = new URL(request.url);
 
+  // Define default BVID, preferring environment variable
+  const defaultBvid = (typeof process !== 'undefined' && process.env.BILIBILI_BVID) 
+                      ? process.env.BILIBILI_BVID 
+                      : "BV1rT9EYbEJa";
+
   const bvidFromParams = url.searchParams.get("bvid");
   const startTimeFromParams = url.searchParams.get("startTime"); // Expected to be UTC ISO string from client
   const endTimeFromParams = url.searchParams.get("endTime");     // Expected to be UTC ISO string from client
   const intervalFromParams = url.searchParams.get("interval");
 
-  const bvid = bvidFromParams || "BV1rT9EYbEJa";
+  // Determine the final BVID to use: from params or the default
+  const bvid = bvidFromParams || defaultBvid;
   const interval = intervalFromParams || "1h";
 
   // Now directly use params if they exist, assuming client sent UTC ISO
@@ -165,8 +171,8 @@ export default function Index() {
   const handleSubmit = useCallback((formData: FormData) => {
     const startTimeLocal = formData.get("startTime") as string;
     const endTimeLocal = formData.get("endTime") as string;
-    const bvidValue = formData.get("bvid") as string || "BV1rT9EYbEJa";
-    const intervalValue = formData.get("interval") as string || "1h";
+    const bvidValue = formData.get("bvid") as string || bvid;
+    const intervalValue = formData.get("interval") as string || interval;
     
     let startTimeUtcIso: string | null = null;
     let endTimeUtcIso: string | null = null;
@@ -203,7 +209,7 @@ export default function Index() {
       console.warn("Invalid date/time input, submission aborted.");
       // Optionally provide user feedback
     }
-  }, [submit]);
+  }, [submit, bvid, interval]);
 
   // Handle manual form submission
   const handleFormSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
