@@ -1,14 +1,78 @@
-<div align="center">
-<h1>Bilibili Watcher</h1>
-<img src="https://github.com/user-attachments/assets/b6d55b43-a2b9-452b-98b2-958a1a3ec4a9" width="300" />
-</div>
+<a name="readme-top"></a>
+<h1 align="center">
+    <img src="https://github.com/user-attachments/assets/b6d55b43-a2b9-452b-98b2-958a1a3ec4a9" alt="Bilibili Watcher" width="240">
+  <br>
+  Bilibili Watcher
+</h1>
 
-本项目是一个 Bilibili 视频观看时长追踪与分析工具。旨在帮助用户记录和分析在 Bilibili 观看视频的时长数据，提供数据洞察。
-## 使用截图
+## Bilibili Watcher 是什么
+
+Bilibili Watcher 是一个开源的 Bilibili 视频观看时长追踪与分析工具。它能够自动记录你在 Bilibili 上观看某个视频的时长数据，并通过直观的图表和数据分析，帮助你了解自己的观看习惯和偏好。
+
+### 主要特点
+
+- 📊 **数据可视化**：提供直观的观看时长统计图表
+- 🔄 **自动同步**：定时自动同步 Bilibili 观看进度
+- 🌙 **深色模式**：支持浅色/深色主题切换
+- 📱 **响应式设计**：完美适配桌面和移动设备
+- 🔒 **数据安全**：本地部署，数据完全掌握在自己手中
+
+### 使用场景
+
+1. **个人时间管理**
+   - 追踪每日/每周/每月的视频观看时长
+   - 分析观看习惯，优化时间分配
+   - 了解自己最常观看的内容类型
+
+2. **学习进度追踪**
+   - 记录学习类视频的观看时长
+   - 分析学习效率和专注度
+   - 制定合理的学习计划
+
+
+### 使用截图
 |Light|Dark|
 |----|----|
 |![image](https://github.com/user-attachments/assets/0734d91c-ab09-4109-8539-fd1ca38c1a6d)|![image](https://github.com/user-attachments/assets/067b1484-021a-48fe-a360-28e590a9bfb2)|
 
+## 快速开始
+
+### 使用 Docker（推荐）
+
+1. **克隆项目**
+   ```bash
+   git clone https://github.com/krisxia0506/bilibili-watcher.git
+   cd bilibili-watcher
+   ```
+
+2. **配置环境变量**
+   ```bash
+   cp .env.example .env
+   ```
+   编辑 `.env` 文件，设置以下必要参数：
+   - `BILIBILI_SESSDATA`：你的 Bilibili SESSDATA（用于获取观看进度）
+   - `BILIBILI_BVID`：要追踪的视频 BVID
+
+3. **启动服务**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **访问服务**
+   - 前端界面：http://localhost:3000
+   - 后端 API：http://localhost:8080
+
+### 获取 Bilibili SESSDATA
+
+1. 登录 [Bilibili](https://www.bilibili.com)
+2. 打开浏览器开发者工具（F12）
+3. 在 应用（Application）-->存储（Storage） 中找到 Cookies
+4. 找到 `SESSDATA` 字段的值并复制，例如：
+```
+SESSDATA=bb723733%2C1762308022%2Ce456d%2A51CjBn_Tu3wVQ012OWHJ1ZQ7VZLWEADQQbEVSrwACbJSY0oqhw5An18gPkUogW2JU5qzASVmo3cVZmbFdkY3ZJdy12YWlOcElYMW5ydWRQWUoySFhuZU9oeFFaWUI3Q1RhVHI2VWpkLXU3QWFxQWMzSngyT24zNDRPOExmcEV2RldsME1zWERwSVh12345
+```
+
+> ⚠️ 注意：请妥善保管你的 SESSDATA，不要分享给他人。
 
 ## 核心功能
 
@@ -161,3 +225,14 @@ sequenceDiagram
 
 ## 参考项目
 [哔哩哔哩 - API 收集整理](https://socialsisteryi.github.io/bilibili-API-collect/)
+
+
+### Star History
+
+[![Star History](https://api.star-history.com/svg?repos=krisxia0506/bilibili-watcher&type=Date)](https://star-history.com/#krisxia0506/bilibili-watcher)
+
+<p align="right" style="font-size: 14px; color: #555; margin-top: 20px;">
+    <a href="#readme-top" style="text-decoration: none; color: #007bff; font-weight: bold;">
+        ↑ 返回顶部 ↑
+    </a>
+</p>
