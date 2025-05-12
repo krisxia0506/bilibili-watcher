@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	// "strings"
+	"strings"
 	// "github.com/spf13/viper" // Removed Viper dependency
 )
 
@@ -35,8 +35,8 @@ type DatabaseConfig struct {
 
 // BilibiliConfig 保存 Bilibili API 相关配置。
 type BilibiliConfig struct {
-	SessData   string // Env: BILIBILI_SESSDATA (Bilibili SESSDATA Cookie, 必需)
-	TargetBVID string // Env: BILIBILI_BVID (用于定时任务的目标 BVID, 必需)
+	SessData    string   // Bilibili 会话数据
+	TargetBVIDs []string // 目标视频BVID列表
 }
 
 // SchedulerConfig 保存定时任务相关配置。
@@ -68,7 +68,17 @@ func LoadConfig() (*Config, error) {
 
 	// --- Bilibili 配置 ---
 	cfg.Bilibili.SessData = getEnvOrErr("BILIBILI_SESSDATA")
-	cfg.Bilibili.TargetBVID = getEnvOrErr("BILIBILI_BVID")
+	// 解析多个 BVID
+	bvidStr := getEnvOrErr("BILIBILI_BVID")
+	if bvidStr != "" {
+		bvids := strings.Split(bvidStr, ",")
+		for i, bvid := range bvids {
+			bvids[i] = strings.TrimSpace(bvid)
+		}
+		cfg.Bilibili.TargetBVIDs = bvids
+	} else {
+		return nil, fmt.Errorf("required environment variable BILIBILI_BVID is not set")
+	}
 
 	// --- 定时任务配置 ---
 	cfg.Scheduler.Cron = getEnv("SCHEDULER_CRON", "0 0 * * *")
@@ -91,10 +101,7 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("required environment variable DATABASE_DBNAME is not set")
 	}
 	if cfg.Bilibili.SessData == "" {
-		return nil, fmt.Errorf("required environment variable SESSDATA is not set")
-	}
-	if cfg.Bilibili.TargetBVID == "" {
-		return nil, fmt.Errorf("required environment variable WATCH_TARGET_BVID is not set")
+		return nil, fmt.Errorf("required environment variable BILIBILI_SESSDATA is not set")
 	}
 
 	return cfg, nil

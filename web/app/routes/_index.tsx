@@ -23,6 +23,7 @@ interface WatchSegmentsResponse {
 // 定义 LoaderData 类型
 interface LoaderData {
   bvid: string;
+  bvidList: string[];
   startTime: string | null;
   endTime: string | null;
   interval: string;
@@ -45,9 +46,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
 
   // Define default BVID, preferring environment variable
-  const defaultBvid = (typeof process !== 'undefined' && process.env.BILIBILI_BVID) 
+  const defaultBvidStr = (typeof process !== 'undefined' && process.env.BILIBILI_BVID) 
                       ? process.env.BILIBILI_BVID 
                       : "BV1rT9EYbEJa";
+                      
+  // 解析多个 BVID
+  const bvidList = defaultBvidStr.split(',').map(bvid => bvid.trim());
+  const defaultBvid = bvidList[0] || "BV1rT9EYbEJa";
 
   const bvidFromParams = url.searchParams.get("bvid");
   const startTimeFromParams = url.searchParams.get("startTime"); // Expected to be UTC ISO string from client
@@ -112,6 +117,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   
   return json<LoaderData>({
     bvid,
+    bvidList,
     startTime: startTimeForClientDisplay,
     endTime: endTimeForClientDisplay,
     interval,
@@ -123,7 +129,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 // 页面组件
 export default function Index() {
-  const { bvid, startTime: startTimeFromLoader, endTime: endTimeFromLoader, interval, segments, error } = useLoaderData<typeof loader>();
+  const { bvid, bvidList, startTime: startTimeFromLoader, endTime: endTimeFromLoader, interval, segments, error } = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const formRef = useRef<HTMLFormElement>(null);
   
@@ -250,15 +256,37 @@ export default function Index() {
 
       <Form ref={formRef} method="get" onSubmit={handleFormSubmit} className="mb-10 p-6 bg-white dark:bg-gray-700 rounded-xl shadow-xl space-y-6 max-w-4xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 items-end">
-          <div>
-            <label htmlFor="bvid" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">BVID:</label>
-            <input
-              type="text"
-              name="bvid"
-              id="bvid"
-              defaultValue={bvid}
-              className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
-            />
+          <div className="lg:col-span-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">BVID:</label>
+            <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-lg">
+              {bvidList && bvidList.length > 0 ? (
+                bvidList.map((bvidOption, index) => (
+                  <div key={index} className="flex items-center">
+                    <input
+                      type="radio"
+                      id={`bvid-${index}`}
+                      name="bvid"
+                      value={bvidOption}
+                      defaultChecked={bvid === bvidOption}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                    />
+                    <label htmlFor={`bvid-${index}`} className="ml-2 block text-sm text-gray-700 dark:text-gray-300 truncate">
+                      {bvidOption}
+                    </label>
+                  </div>
+                ))
+              ) : (
+                <div className="py-1">
+                  <input
+                    type="text"
+                    name="bvid"
+                    id="bvid"
+                    defaultValue={bvid}
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Time:</label>

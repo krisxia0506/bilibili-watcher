@@ -58,42 +58,47 @@ func main() {
 	// --- 初始化并启动调度器 ---
 	appScheduler := scheduler.NewScheduler()
 
-	// 定义获取视频进度的作业逻辑
-	fetchVideoProgressJob := func() {
-		targetBVID := cfg.Bilibili.TargetBVID // 使用 cfg.Bilibili.TargetBVID
-		if targetBVID == "" {
-			log.Println("Error: WATCH_TARGET_BVID is not configured. Skipping progress fetch job.")
-			return
-		}
+	// 创建获取单个 BVID 视频进度的函数
+	createFetchVideoProgressJobForBVID := func(bvid string) func() {
+		return func() {
+			if bvid == "" {
+				log.Println("Error: Empty BVID provided. Skipping progress fetch job.")
+				return
+			}
 
-		var targetCID int64 = 0
+			jobName := fmt.Sprintf("FetchVideoProgress(BVID: %s)", bvid)
+			log.Printf("Cron job starting: %s", jobName)
+			ctx := context.Background()
 
-		jobName := fmt.Sprintf("FetchVideoProgress(BVID: %s)", targetBVID)
-		log.Printf("Cron job starting: %s", jobName)
-		ctx := context.Background()
+			// 1. 获取视频的 AID 和第一个 CID
+			videoView, err := biliClient.GetVideoView(ctx, "", bvid)
+			if err != nil {
+				log.Printf("Error fetching video view for BVID %s in job '%s': %v. Skipping progress fetch.", bvid, jobName, err)
+				return
+			}
+			if videoView == nil || len(videoView.Pages) == 0 {
+				log.Printf("No pages found for video BVID %s in job '%s'. Skipping progress fetch.", bvid, jobName)
+				return
+			}
+			targetCID := videoView.Pages[0].Cid
+			log.Printf("Determined targetCID: %d for BVID: %s", targetCID, bvid)
 
-		// 1. 获取视频的 AID 和第一个 CID
-		videoView, err := biliClient.GetVideoView(ctx, "", targetBVID)
-		if err != nil {
-			log.Printf("Error fetching video view for BVID %s in job '%s': %v. Skipping progress fetch.", targetBVID, jobName, err)
-			return
+			// 2. 获取并保存进度
+			if err := videoProgressService.FetchAndSaveVideoProgress(ctx, "", bvid, strconv.FormatInt(targetCID, 10)); err != nil {
+				log.Printf("Error executing FetchAndSaveVideoProgress for BVID '%s', CID %d in job '%s': %v", bvid, targetCID, jobName, err)
+			}
+			log.Printf("Cron job finished: %s (processed BVID: %s, CID: %d)", jobName, bvid, targetCID)
 		}
-		if videoView == nil || len(videoView.Pages) == 0 {
-			log.Printf("No pages found for video BVID %s in job '%s'. Skipping progress fetch.", targetBVID, jobName)
-			return
-		}
-		targetCID = videoView.Pages[0].Cid
-		log.Printf("Determined targetCID: %d for BVID: %s", targetCID, targetBVID)
-
-		// 2. 获取并保存进度
-		if err := videoProgressService.FetchAndSaveVideoProgress(ctx, "", targetBVID, strconv.FormatInt(targetCID, 10)); err != nil {
-			log.Printf("Error executing FetchAndSaveVideoProgress for  BVID '%s', CID %d in job '%s': %v", targetBVID, targetCID, jobName, err)
-		}
-		log.Printf("Cron job finished: %s (processed BVID: %s, CID: %d)", jobName, targetBVID, targetCID)
 	}
 
-	if err := appScheduler.ScheduleJob("FetchVideoProgress", cfg.Scheduler.Cron, fetchVideoProgressJob); err != nil {
-		log.Fatalf("Failed to schedule job 'FetchVideoProgress': %v", err)
+	// 为每个 BVID 创建单独的定时任务
+	if len(cfg.Bilibili.TargetBVIDs) > 0 {
+		for _, bvid := range cfg.Bilibili.TargetBVIDs {
+			jobName := fmt.Sprintf("FetchVideoProgress_BVID_%s", bvid)
+			if err := appScheduler.ScheduleJob(jobName, cfg.Scheduler.Cron, createFetchVideoProgressJobForBVID(bvid)); err != nil {
+				log.Printf("Failed to schedule job '%s' for BVID '%s': %v", jobName, bvid, err)
+			}
+		}
 	}
 
 	go appScheduler.Start() // 在单独的 goroutine 中启动调度器
