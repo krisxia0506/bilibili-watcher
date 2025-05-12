@@ -5,6 +5,18 @@
   Bilibili Watcher
 </h1>
 
+<p align="center">
+  <a href="https://goreportcard.com/report/github.com/krisxia0506/bilibili-watcher">
+    <img alt="go report" src="https://goreportcard.com/badge/github.com/krisxia0506/bilibili-watcher" />
+  </a>
+    <a
+    href="https://github.com/krisxia0506/bilibili-watcher"
+    target="_blank"
+  >
+    <img alt="Github Stars" src="https://img.shields.io/github/stars/krisxia0506/bilibili-watcher?logo=github">
+  </a>
+</p>
+
 ## Bilibili Watcher 是什么
 
 Bilibili Watcher 是一个开源的 Bilibili 视频观看时长追踪与分析工具。它能够自动记录你在 Bilibili 上观看某个视频的时长数据，并通过直观的图表和数据分析，帮助你了解自己的观看习惯和偏好。
@@ -229,15 +241,7 @@ sequenceDiagram
 
 ### Star History
 
-## Star History
-
-<a href="https://www.star-history.com/#krisxia0506/bilibili-watcher&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=krisxia0506/bilibili-watcher&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=krisxia0506/bilibili-watcher&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=krisxia0506/bilibili-watcher&type=Date" />
- </picture>
-</a>
+[![Star History Chart](https://api.star-history.com/svg?repos=krisxia0506/bilibili-watcher&type=Date)](https://www.star-history.com/#krisxia0506/bilibili-watcher&Date)
 
 <p align="right" style="font-size: 14px; color: #555; margin-top: 20px;">
     <a href="#readme-top" style="text-decoration: none; color: #007bff; font-weight: bold;">
