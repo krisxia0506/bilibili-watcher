@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { Form, useLoaderData, useSubmit } from "@remix-run/react";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import WatchTimeChart from "~/components/WatchTimeChart";
 
 // 定义 API 响应体中 data.segments 数组元素的类型
@@ -133,6 +133,16 @@ export default function Index() {
   const submit = useSubmit();
   const formRef = useRef<HTMLFormElement>(null);
   
+  // 添加下拉框状态
+  const [bvidDropdownOpen, setBvidDropdownOpen] = useState(false);
+  const [intervalDropdownOpen, setIntervalDropdownOpen] = useState(false);
+  const [selectedBvid, setSelectedBvid] = useState(bvid);
+  const [selectedInterval, setSelectedInterval] = useState(interval);
+  
+  // 下拉框引用，用于点击外部关闭
+  const bvidDropdownRef = useRef<HTMLDivElement>(null);
+  const intervalDropdownRef = useRef<HTMLDivElement>(null);
+  
   console.log("[Index Component] Received loader data:", 
     { bvid, startTime: startTimeFromLoader, endTime: endTimeFromLoader, interval, segments_count: segments?.length, error }
   );
@@ -241,6 +251,35 @@ export default function Index() {
     // Dependencies updated slightly
   }, [startTimeFromLoader, endTimeFromLoader, segments, error, handleSubmit]);
 
+  // 点击外部关闭下拉框
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (bvidDropdownRef.current && !bvidDropdownRef.current.contains(event.target as Node)) {
+        setBvidDropdownOpen(false);
+      }
+      if (intervalDropdownRef.current && !intervalDropdownRef.current.contains(event.target as Node)) {
+        setIntervalDropdownOpen(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // 选择BVID
+  const handleBvidSelect = (bvidOption: string) => {
+    setSelectedBvid(bvidOption);
+    setBvidDropdownOpen(false);
+  };
+
+  // 选择时间间隔
+  const handleIntervalSelect = (intervalOption: string) => {
+    setSelectedInterval(intervalOption);
+    setIntervalDropdownOpen(false);
+  };
+
   return (
     <div className="font-sans p-4 md:p-8 bg-gray-100 dark:bg-gray-800 min-h-screen">
       <header className="mb-10">
@@ -256,36 +295,68 @@ export default function Index() {
 
       <Form ref={formRef} method="get" onSubmit={handleFormSubmit} className="mb-10 p-6 bg-white dark:bg-gray-700 rounded-xl shadow-xl space-y-6 max-w-4xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 items-end">
+          {/* BVID 自定义下拉框 */}
           <div>
             <label htmlFor="bvid" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">BVID:</label>
-            <div className="relative">
-              <select
-                name="bvid"
-                id="bvid"
-                defaultValue={bvid}
-                className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 dark:text-gray-100 pr-10 appearance-none"
+            <div className="relative" ref={bvidDropdownRef}>
+              <input 
+                type="hidden" 
+                name="bvid" 
+                value={selectedBvid}
+              />
+              <button
+                type="button"
+                className="relative w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm pl-3 pr-10 py-2.5 text-left cursor-default focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                onClick={() => setBvidDropdownOpen(!bvidDropdownOpen)}
+                aria-haspopup="listbox"
+                aria-expanded={bvidDropdownOpen}
               >
-                {bvidList && bvidList.length > 0 ? (
-                  bvidList.map((bvidOption, index) => (
-                    <option 
-                      key={index} 
-                      value={bvidOption}
-                      className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    >
-                      {bvidOption}
-                    </option>
-                  ))
-                ) : (
-                  <option value={bvid} className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">{bvid}</option>
-                )}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </div>
+                <span className="block truncate text-gray-900 dark:text-gray-100">{selectedBvid}</span>
+                <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400 dark:text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z" clipRule="evenodd" />
+                  </svg>
+                </span>
+              </button>
+
+              {bvidDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                  <ul tabIndex={-1} role="listbox" aria-labelledby="bvid-dropdown">
+                    {bvidList && bvidList.length > 0 ? (
+                      bvidList.map((bvidOption, index) => (
+                        <li
+                          key={index}
+                          className={`cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-blue-100 dark:hover:bg-blue-900 ${
+                            bvidOption === selectedBvid ? 'bg-blue-50 dark:bg-blue-800 text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'
+                          }`}
+                          onClick={() => handleBvidSelect(bvidOption)}
+                          role="option"
+                          aria-selected={bvidOption === selectedBvid}
+                        >
+                          <span className="block truncate font-medium">{bvidOption}</span>
+                          {bvidOption === selectedBvid && (
+                            <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-600 dark:text-blue-400">
+                              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                              </svg>
+                            </span>
+                          )}
+                        </li>
+                      ))
+                    ) : (
+                      <li
+                        className="cursor-default select-none relative py-2 pl-3 pr-9 text-gray-900 dark:text-gray-100 bg-blue-50 dark:bg-blue-800"
+                        onClick={() => handleBvidSelect(bvid)}
+                      >
+                        <span className="block truncate font-medium">{bvid}</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
+          
           <div>
             <label htmlFor="startTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Time:</label>
             <input
@@ -297,6 +368,7 @@ export default function Index() {
               className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
+          
           <div>
             <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Time:</label>
             <input
@@ -308,28 +380,113 @@ export default function Index() {
               className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
+          
+          {/* Interval 自定义下拉框 */}
           <div>
             <label htmlFor="interval" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Interval:</label>
-            <div className="relative">
-              <select
-                name="interval"
-                id="interval"
-                defaultValue={interval}
-                className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 dark:text-gray-100 pr-10 appearance-none"
+            <div className="relative" ref={intervalDropdownRef}>
+              <input 
+                type="hidden" 
+                name="interval" 
+                value={selectedInterval}
+              />
+              <button
+                type="button"
+                className="relative w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm pl-3 pr-10 py-2.5 text-left cursor-default focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                onClick={() => setIntervalDropdownOpen(!intervalDropdownOpen)}
+                aria-haspopup="listbox"
+                aria-expanded={intervalDropdownOpen}
               >
-                <option value="10m" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">10 Minutes</option>
-                <option value="30m" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">30 Minutes</option>
-                <option value="1h" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">1 Hour</option>
-                <option value="1d" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">1 Day</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </div>
+                <span className="block truncate text-gray-900 dark:text-gray-100">
+                  {selectedInterval === '10m' ? '10 Minutes' : 
+                   selectedInterval === '30m' ? '30 Minutes' : 
+                   selectedInterval === '1h' ? '1 Hour' : '1 Day'}
+                </span>
+                <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400 dark:text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z" clipRule="evenodd" />
+                  </svg>
+                </span>
+              </button>
+
+              {intervalDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                  <ul tabIndex={-1} role="listbox" aria-labelledby="interval-dropdown">
+                    <li
+                      className={`cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-blue-100 dark:hover:bg-blue-900 ${
+                        selectedInterval === '10m' ? 'bg-blue-50 dark:bg-blue-800 text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'
+                      }`}
+                      onClick={() => handleIntervalSelect('10m')}
+                      role="option"
+                      aria-selected={selectedInterval === '10m'}
+                    >
+                      <span className="block truncate font-medium">10 Minutes</span>
+                      {selectedInterval === '10m' && (
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-600 dark:text-blue-400">
+                          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                    </li>
+                    <li
+                      className={`cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-blue-100 dark:hover:bg-blue-900 ${
+                        selectedInterval === '30m' ? 'bg-blue-50 dark:bg-blue-800 text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'
+                      }`}
+                      onClick={() => handleIntervalSelect('30m')}
+                      role="option"
+                      aria-selected={selectedInterval === '30m'}
+                    >
+                      <span className="block truncate font-medium">30 Minutes</span>
+                      {selectedInterval === '30m' && (
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-600 dark:text-blue-400">
+                          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                    </li>
+                    <li
+                      className={`cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-blue-100 dark:hover:bg-blue-900 ${
+                        selectedInterval === '1h' ? 'bg-blue-50 dark:bg-blue-800 text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'
+                      }`}
+                      onClick={() => handleIntervalSelect('1h')}
+                      role="option"
+                      aria-selected={selectedInterval === '1h'}
+                    >
+                      <span className="block truncate font-medium">1 Hour</span>
+                      {selectedInterval === '1h' && (
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-600 dark:text-blue-400">
+                          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                    </li>
+                    <li
+                      className={`cursor-default select-none relative py-2 pl-3 pr-9 hover:bg-blue-100 dark:hover:bg-blue-900 ${
+                        selectedInterval === '1d' ? 'bg-blue-50 dark:bg-blue-800 text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-gray-100'
+                      }`}
+                      onClick={() => handleIntervalSelect('1d')}
+                      role="option"
+                      aria-selected={selectedInterval === '1d'}
+                    >
+                      <span className="block truncate font-medium">1 Day</span>
+                      {selectedInterval === '1d' && (
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-600 dark:text-blue-400">
+                          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
+                    </li>
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </div>
+        
         <div className="text-center pt-2">
           <button
             type="submit"
