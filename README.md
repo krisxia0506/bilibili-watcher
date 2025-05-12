@@ -229,7 +229,15 @@ sequenceDiagram
 
 ### Star History
 
-[![Star History](https://api.star-history.com/svg?repos=krisxia0506/bilibili-watcher&type=Date)](https://star-history.com/#krisxia0506/bilibili-watcher)
+## Star History
+
+<a href="https://www.star-history.com/#krisxia0506/bilibili-watcher&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=krisxia0506/bilibili-watcher&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=krisxia0506/bilibili-watcher&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=krisxia0506/bilibili-watcher&type=Date" />
+ </picture>
+</a>
 
 <p align="right" style="font-size: 14px; color: #555; margin-top: 20px;">
     <a href="#readme-top" style="text-decoration: none; color: #007bff; font-weight: bold;">
