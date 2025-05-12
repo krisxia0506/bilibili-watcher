@@ -272,12 +272,38 @@ export default function Index() {
   const handleBvidSelect = (bvidOption: string) => {
     setSelectedBvid(bvidOption);
     setBvidDropdownOpen(false);
+    
+    // 自动提交表单
+    const formData = new FormData(formRef.current!);
+    formData.set("bvid", bvidOption); // 更新formData中的bvid值
+    handleSubmit(formData);
   };
 
   // 选择时间间隔
   const handleIntervalSelect = (intervalOption: string) => {
     setSelectedInterval(intervalOption);
     setIntervalDropdownOpen(false);
+    
+    // 自动提交表单
+    const formData = new FormData(formRef.current!);
+    formData.set("interval", intervalOption); // 更新formData中的interval值
+    handleSubmit(formData);
+  };
+  
+  // 处理开始时间变化
+  const handleStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.value && formRef.current) {
+      const formData = new FormData(formRef.current);
+      handleSubmit(formData);
+    }
+  };
+  
+  // 处理结束时间变化
+  const handleEndTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.value && formRef.current) {
+      const formData = new FormData(formRef.current);
+      handleSubmit(formData);
+    }
   };
 
   return (
@@ -364,6 +390,7 @@ export default function Index() {
               name="startTime"
               id="startTime"
               defaultValue={initialStartTimeForInput}
+              onChange={handleStartTimeChange}
               required
               className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
             />
@@ -376,6 +403,7 @@ export default function Index() {
               name="endTime"
               id="endTime"
               defaultValue={initialEndTimeForInput}
+              onChange={handleEndTimeChange}
               required
               className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
             />
