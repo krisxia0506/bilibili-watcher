@@ -256,36 +256,34 @@ export default function Index() {
 
       <Form ref={formRef} method="get" onSubmit={handleFormSubmit} className="mb-10 p-6 bg-white dark:bg-gray-700 rounded-xl shadow-xl space-y-6 max-w-4xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 items-end">
-          <div className="lg:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">BVID:</label>
-            <div className="space-y-2 max-h-40 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-lg">
-              {bvidList && bvidList.length > 0 ? (
-                bvidList.map((bvidOption, index) => (
-                  <div key={index} className="flex items-center">
-                    <input
-                      type="radio"
-                      id={`bvid-${index}`}
-                      name="bvid"
+          <div>
+            <label htmlFor="bvid" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">BVID:</label>
+            <div className="relative">
+              <select
+                name="bvid"
+                id="bvid"
+                defaultValue={bvid}
+                className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 dark:text-gray-100 pr-10 appearance-none"
+              >
+                {bvidList && bvidList.length > 0 ? (
+                  bvidList.map((bvidOption, index) => (
+                    <option 
+                      key={index} 
                       value={bvidOption}
-                      defaultChecked={bvid === bvidOption}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                    />
-                    <label htmlFor={`bvid-${index}`} className="ml-2 block text-sm text-gray-700 dark:text-gray-300 truncate">
+                      className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    >
                       {bvidOption}
-                    </label>
-                  </div>
-                ))
-              ) : (
-                <div className="py-1">
-                  <input
-                    type="text"
-                    name="bvid"
-                    id="bvid"
-                    defaultValue={bvid}
-                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
-                  />
-                </div>
-              )}
+                    </option>
+                  ))
+                ) : (
+                  <option value={bvid} className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">{bvid}</option>
+                )}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </div>
             </div>
           </div>
           <div>
@@ -312,17 +310,24 @@ export default function Index() {
           </div>
           <div>
             <label htmlFor="interval" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Interval:</label>
-            <select
-              name="interval"
-              id="interval"
-              defaultValue={interval}
-              className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out bg-white dark:bg-gray-800 dark:text-gray-100"
-            >
-              <option value="10m" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">10 Minutes</option>
-              <option value="30m" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">30 Minutes</option>
-              <option value="1h" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">1 Hour</option>
-              <option value="1d" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">1 Day</option>
-            </select>
+            <div className="relative">
+              <select
+                name="interval"
+                id="interval"
+                defaultValue={interval}
+                className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 dark:text-gray-100 pr-10 appearance-none"
+              >
+                <option value="10m" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">10 Minutes</option>
+                <option value="30m" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">30 Minutes</option>
+                <option value="1h" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">1 Hour</option>
+                <option value="1d" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">1 Day</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
         <div className="text-center pt-2">
