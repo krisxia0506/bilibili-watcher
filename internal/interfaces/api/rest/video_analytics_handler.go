@@ -90,7 +90,7 @@ func (h *VideoAnalyticsHandler) GetWatchedSegments(c *gin.Context) {
 	}
 
 	// 调用应用服务
-	segments, err := h.appService.GetWatchedSegments(c.Request.Context(), req.AID, req.BVID, startTime, endTime, interval)
+	analyticsResult, err := h.appService.GetWatchedSegments(c.Request.Context(), req.AID, req.BVID, startTime, endTime, interval)
 	if err != nil {
 		// 根据应用层返回的错误类型决定 HTTP 状态码和业务码
 		response.Error(c, http.StatusInternalServerError, response.CodeInternalError, fmt.Sprintf("Failed to calculate watched segments: %v", err))
@@ -99,9 +99,10 @@ func (h *VideoAnalyticsHandler) GetWatchedSegments(c *gin.Context) {
 
 	// 映射结果到响应 DTO
 	respData := dto.GetWatchedSegmentsResponse{
-		Segments: make([]dto.WatchedSegment, 0, len(segments)),
+		Segments:                make([]dto.WatchedSegment, 0, len(analyticsResult.Segments)),
+		TotalWatchedDurationSec: int64(analyticsResult.TotalWatchedDuration.Seconds()),
 	}
-	for _, seg := range segments {
+	for _, seg := range analyticsResult.Segments {
 		respData.Segments = append(respData.Segments, dto.WatchedSegment{
 			SegmentStartTime:   seg.SegmentStartTime,
 			SegmentEndTime:     seg.SegmentEndTime,

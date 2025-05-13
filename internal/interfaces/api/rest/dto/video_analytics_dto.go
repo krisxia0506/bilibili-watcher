@@ -20,5 +20,6 @@ type WatchedSegment struct {
 
 // GetWatchedSegmentsResponse 获取观看分段响应体 (Data 部分)。
 type GetWatchedSegmentsResponse struct {
-	Segments []WatchedSegment `json:"segments"`
+	Segments                []WatchedSegment `json:"segments"`
+	TotalWatchedDurationSec int64            `json:"total_watched_duration_seconds"` // 新增：总观看时长（秒）
 }

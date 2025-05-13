@@ -12,21 +12,27 @@ import (
 	"github.com/krisxia0506/bilibili-watcher/internal/domain/service"
 )
 
-// VideoAnalyticsService 定义了视频分析相关的应用服务接口。
-type VideoAnalyticsService interface {
-	// GetWatchedSegments 计算并返回指定时间范围和间隔内的视频观看分段时长。
-	GetWatchedSegments(ctx context.Context,
-		aidStr, bvidStr string, // aid 和 bvid 提供一个
-		overallStartTime, overallEndTime time.Time,
-		interval time.Duration,
-	) ([]WatchedSegmentResult, error)
-}
-
 // WatchedSegmentResult 包含单个时间分段的计算结果。
 type WatchedSegmentResult struct {
 	SegmentStartTime time.Time
 	SegmentEndTime   time.Time
 	WatchedDuration  time.Duration
+}
+
+// VideoAnalyticsResult 包含视频分析的完整结果，包括分段和总时长。
+type VideoAnalyticsResult struct {
+	Segments             []WatchedSegmentResult
+	TotalWatchedDuration time.Duration
+}
+
+// VideoAnalyticsService 定义了视频分析相关的应用服务接口。
+type VideoAnalyticsService interface {
+	// GetWatchedSegments 计算并返回指定时间范围和间隔内的视频观看分段时长及总时长。
+	GetWatchedSegments(ctx context.Context,
+		aidStr, bvidStr string, // aid 和 bvid 提供一个
+		overallStartTime, overallEndTime time.Time,
+		interval time.Duration,
+	) (VideoAnalyticsResult, error)
 }
 
 // videoAnalyticsService 实现了 VideoAnalyticsService。
@@ -83,25 +89,27 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 	aidStr, bvidStr string,
 	overallStartTime, overallEndTime time.Time,
 	interval time.Duration,
-) ([]WatchedSegmentResult, error) {
+) (VideoAnalyticsResult, error) {
+
+	emptyResult := VideoAnalyticsResult{Segments: []WatchedSegmentResult{}, TotalWatchedDuration: 0}
 
 	if aidStr == "" && bvidStr == "" {
-		return nil, fmt.Errorf("必须提供 aid 或 bvid")
+		return emptyResult, fmt.Errorf("必须提供 aid 或 bvid")
 	}
 	if interval <= 0 {
-		return nil, fmt.Errorf("interval 必须为正数")
+		return emptyResult, fmt.Errorf("interval 必须为正数")
 	}
 	if overallEndTime.Before(overallStartTime) {
-		return nil, fmt.Errorf("结束时间必须在开始时间之后")
+		return emptyResult, fmt.Errorf("结束时间必须在开始时间之后")
 	}
 
 	// 1. 获取视频页面信息
 	videoView, err := s.biliClient.GetVideoView(ctx, aidStr, bvidStr)
 	if err != nil {
-		return nil, fmt.Errorf("获取视频信息失败: %w", err)
+		return emptyResult, fmt.Errorf("获取视频信息失败: %w", err)
 	}
 	if videoView == nil || len(videoView.Pages) == 0 {
-		return nil, fmt.Errorf("视频没有分页信息")
+		return emptyResult, fmt.Errorf("视频没有分页信息")
 	}
 	domainPages := make([]model.VideoPage, 0, len(videoView.Pages))
 	for _, dtoPage := range videoView.Pages {
@@ -112,19 +120,16 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 	actualAID := videoView.Aid
 
 	// 2. 获取时间范围内的所有进度记录，增加足够 buffer
-	// 查找范围比之前略大，确保能包含 overallStartTime 之前的最后一个点 和 overallEndTime 之后的第一个点（如果存在）
-	// 以便计算跨越 overallStartTime 和 overallEndTime 的时长
-	queryStartTime := overallStartTime.Add(-interval * 2) // 查询开始时间再往前推一个间隔
-	queryEndTime := overallEndTime.Add(interval)          // 查询结束时间往后推一个间隔
+	queryStartTime := overallStartTime.Add(-interval * 2)
+	queryEndTime := overallEndTime.Add(interval)
 	log.Printf("查询 AID %d 在扩展时间范围 [%s, %s] 内的进度记录", actualAID, queryStartTime, queryEndTime)
 	progressRecords, err := s.progressRepo.ListByAIDAndTimestampRange(ctx, actualAID, queryStartTime, queryEndTime)
 	if err != nil {
-		return nil, fmt.Errorf("列出进度记录失败: %w", err)
+		return emptyResult, fmt.Errorf("列出进度记录失败: %w", err)
 	}
 
-	if len(progressRecords) < 2 { // 需要至少两条记录才能计算时长
+	if len(progressRecords) < 2 {
 		log.Printf("在扩展时间范围 [%s, %s] 内找到的记录少于2条 (共 %d 条)，无法计算观看时长", queryStartTime, queryEndTime, len(progressRecords))
-		// 返回空的 segments，但每个时间段都存在
 		results := make([]WatchedSegmentResult, 0)
 		segmentStart := overallStartTime
 		for segmentStart.Before(overallEndTime) {
@@ -139,7 +144,7 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 			})
 			segmentStart = segmentEnd
 		}
-		return results, nil
+		return VideoAnalyticsResult{Segments: results, TotalWatchedDuration: 0}, nil
 	}
 
 	// 3. 初始化分段时长 map
@@ -172,32 +177,29 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 		}
 
 		// 确定时长发生区间的起始点 pCurr 属于哪个分段
-		segmentStartTime, isValidSegment := getSegmentStartTime(pCurr.RecordedAt, overallStartTime, overallEndTime, interval)
+		segmentStartTimeForAttribution, isValidSegment := getSegmentStartTime(pCurr.RecordedAt, overallStartTime, overallEndTime, interval)
 
 		if isValidSegment {
 			// 将计算出的时长累加到对应的分段
-			if _, ok := segmentDurations[segmentStartTime]; ok {
+			if _, ok := segmentDurations[segmentStartTimeForAttribution]; ok {
 				log.Printf("[Attribution] Attributing duration %s (from record %d at %s to record %d at %s) to segment starting at %s",
-					duration, pCurr.ID, pCurr.RecordedAt, pNext.ID, pNext.RecordedAt, segmentStartTime)
-				segmentDurations[segmentStartTime] += duration
+					duration, pCurr.ID, pCurr.RecordedAt, pNext.ID, pNext.RecordedAt, segmentStartTimeForAttribution)
+				segmentDurations[segmentStartTimeForAttribution] += duration
 			} else {
-				// 这个情况理论上不应该发生，因为 map 已经用所有有效 segmentStart 初始化了
-				log.Printf("[Attribution Warning] Segment start time %s (from record %d at %s) not found in map.", segmentStartTime, pCurr.ID, pCurr.RecordedAt)
+				log.Printf("[Attribution Warning] Segment start time %s (from record %d at %s) not found in map.", segmentStartTimeForAttribution, pCurr.ID, pCurr.RecordedAt)
 			}
 		} else {
-			// 时长开始于查询范围之外，忽略它（因为它不属于任何目标分段）
 			log.Printf("[Attribution] Skipping duration %s starting at %s (record %d) because it falls outside the requested range [%s, %s)",
 				duration, pCurr.RecordedAt, pCurr.ID, overallStartTime, overallEndTime)
 		}
 	}
 
-	// 5. 从 map 生成最终结果列表
+	// 5. 从 map 生成最终结果列表并计算总时长
 	results := make([]WatchedSegmentResult, 0, len(segmentDurations))
+	var totalWatchedDuration time.Duration
 	segmentResultStart := overallStartTime
-	processedSegments := make(map[time.Time]bool) // 避免重复添加（理论上不需要，但保险）
+	processedSegments := make(map[time.Time]bool)
 
-	// 使用排好序的 map 键（如果需要严格按时间顺序输出）
-	// 或者直接迭代预期的时间点
 	for segmentResultStart.Before(overallEndTime) {
 		segmentEnd := segmentResultStart.Add(interval)
 		if segmentEnd.After(overallEndTime) {
@@ -205,23 +207,23 @@ func (s *videoAnalyticsService) GetWatchedSegments(ctx context.Context,
 		}
 
 		if !processedSegments[segmentResultStart] {
-			duration := segmentDurations[segmentResultStart] // 从 map 获取累积时长，默认为 0
+			duration := segmentDurations[segmentResultStart]
 			results = append(results, WatchedSegmentResult{
 				SegmentStartTime: segmentResultStart,
 				SegmentEndTime:   segmentEnd,
 				WatchedDuration:  duration,
 			})
+			totalWatchedDuration += duration // 累加到总时长
 			log.Printf("[Final Result] Segment [%s, %s]: Duration=%s", segmentResultStart, segmentEnd, duration)
 			processedSegments[segmentResultStart] = true
 		}
 		segmentResultStart = segmentEnd
 	}
 
-	// 可能需要对 results 按 SegmentStartTime 排序，如果 map 迭代顺序不保证
-	// Go 1.12+ map 迭代顺序是随机的，所以最好排序
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].SegmentStartTime.Before(results[j].SegmentStartTime)
 	})
 
-	return results, nil
+	log.Printf("[Total Duration] Calculated for range [%s, %s]: %s", overallStartTime, overallEndTime, totalWatchedDuration)
+	return VideoAnalyticsResult{Segments: results, TotalWatchedDuration: totalWatchedDuration}, nil
 }
