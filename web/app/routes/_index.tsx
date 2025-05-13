@@ -17,6 +17,7 @@ interface WatchSegmentsResponse {
   msg: string;
   data?: {
     segments: WatchSegment[];
+    total_watched_duration_seconds?: number;
   };
 }
 
@@ -28,6 +29,7 @@ interface LoaderData {
   endTime: string | null;
   interval: string;
   segments: WatchSegment[];
+  totalWatchedDurationSec?: number;
   error?: string;
   // 添加一个字段来存储请求参数，方便调试时在客户端查看
   debugRequestParams?: any;
@@ -79,6 +81,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   } : null;
   
   let segments: WatchSegment[] = [];
+  let totalWatchedDurationSec: number | undefined = undefined;
   let apiError: string | undefined = undefined;
   const backendApiBaseUrl = typeof process !== 'undefined' && process.env.BACKEND_API_URL ? process.env.BACKEND_API_URL : "http://localhost:8081";
   const apiUrl = `${backendApiBaseUrl}/api/v1/video/watch-segments`;
@@ -103,6 +106,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           apiError = `API error: ${result.msg}`;
         } else {
           segments = result.data?.segments || [];
+          totalWatchedDurationSec = result.data?.total_watched_duration_seconds;
         }
       }
     } catch (error) {
@@ -122,6 +126,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     endTime: endTimeForClientDisplay,
     interval,
     segments,
+    totalWatchedDurationSec,
     error: apiError,
     debugRequestParams: apiRequestBody, 
   });
@@ -129,7 +134,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 // 页面组件
 export default function Index() {
-  const { bvid, bvidList, startTime: startTimeFromLoader, endTime: endTimeFromLoader, interval, segments, error } = useLoaderData<typeof loader>();
+  const { bvid, bvidList, startTime: startTimeFromLoader, endTime: endTimeFromLoader, interval, segments, totalWatchedDurationSec, error } = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const formRef = useRef<HTMLFormElement>(null);
   
@@ -304,6 +309,31 @@ export default function Index() {
       const formData = new FormData(formRef.current);
       handleSubmit(formData);
     }
+  };
+
+  // 格式化秒为 Xh Ym Zs
+  const formatDuration = (totalSeconds: number | undefined): string => {
+    if (totalSeconds === undefined || totalSeconds < 0) {
+      return "N/A";
+    }
+    if (totalSeconds === 0) {
+      return "0s";
+    }
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    let result = "";
+    if (hours > 0) {
+      result += `${hours}h `;
+    }
+    if (minutes > 0 || (hours > 0 && seconds === 0)) { // 显示分钟，如果小时存在且秒为0，也显示0m
+      result += `${minutes}m `;
+    }
+    if (seconds > 0 || result === "") { // 如果没有小时和分钟，或者秒数大于0，则显示秒
+      result += `${seconds}s`;
+    }
+    return result.trim();
   };
 
   return (
@@ -532,7 +562,12 @@ export default function Index() {
         </div>
       )}
 
-      <div className="p-4 sm:p-6 bg-white dark:bg-gray-700 rounded-xl shadow-xl max-w-6xl mx-auto">
+      <div className="relative p-4 sm:p-6 bg-white dark:bg-gray-700 rounded-xl shadow-xl max-w-6xl mx-auto">
+        {totalWatchedDurationSec !== undefined && (
+          <div className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 bg-red-500 text-white text-sm sm:text-base font-semibold rounded-md shadow-lg z-10">
+            Total: {formatDuration(totalWatchedDurationSec)}
+          </div>
+        )}
         <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-6 text-center">Watch Durations</h2>
         <WatchTimeChart segments={segments || []} />
       </div>
